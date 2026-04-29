@@ -1,0 +1,61 @@
+package services;
+
+import javax.inject.Singleton;
+import java.net.URI;
+
+import javax.ws.rs.*;
+import javax.ws.rs.Path;
+import javax.ws.rs.client.*;
+import javax.ws.rs.core.*;
+
+import java.util.ArrayList;
+import java.util.List;
+
+
+//ESTA ES LA CARRERA
+@Singleton
+@Path("Servicio")
+public class Servicio {
+	
+	private ArrayList<Proceso> miProcesos = new ArrayList<Proceso>();
+
+	public Servicio() {
+		int i;
+		for (i=0; i<6; i++) {
+			miProcesos.add(new Proceso(i, false)); 
+		}
+        
+    }
+	
+	@GET
+    @Path("inicio")
+    @Produces(MediaType.TEXT_PLAIN)
+	public synchronized String inicio(int propuesta) {
+		String s="s";
+		int i;
+		for(Proceso proc : miProcesos) {
+            proc.propuesta(propuesta);
+        }
+		return s;
+		
+    }
+	
+	
+	@GET
+    @Path("info")
+    @Produces(MediaType.TEXT_PLAIN)
+	public synchronized String info() {
+		String s="s";
+		
+		return s;
+		
+    }
+	
+	public synchronized  String cambio() {
+		String s="s";
+		
+		return s;
+	}
+	
+
+}
