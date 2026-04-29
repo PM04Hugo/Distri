@@ -1,0 +1,98 @@
+
+package services;
+
+import javax.inject.Singleton;
+import javax.ws.rs.Path;
+import javax.ws.rs.client.*;
+import javax.ws.rs.core.*;
+import java.net.URI;
+import java.util.ArrayList;
+import java.nio.file.*;
+import java.util.List;
+import java.util.Scanner;
+
+
+
+
+//LA INTERFAZZZZZZZZZZZZZZZZZ
+@Path("Cliente")
+public class Cliente {
+	
+	//Le da la info a los 3 servidores sobre, con quien hablan (procesos), quienes son (servidores)
+	
+	private int i;
+	private boolean cola;
+	private Client clienteRest = ClientBuilder.newClient(); //Creamos el cliente, cada atleta será uno
+    URI uri=UriBuilder.fromUri("http://localhost:8080/procesos/rest/Servicio").build();
+    WebTarget target = clienteRest.target(uri);// se tiene que atar a la web
+    
+	
+	//Varios server
+	//ArrayList<Client> clientes = new ArrayList<Client>();
+	//List<String> todas = Files.readAllLines(Paths.get("config.txt"));
+    //String[] url = new String[3];
+	//ArrayList<String> urls= new ArrayList<String>();
+	/*for (i=0 ; i< 3 ;i++ ) {
+		//.txt
+		url[i] = todas.get(i);
+		clientes.add( ClientBuilder.newClient());
+		URI uri=UriBuilder.fromUri(url[i]).build(); //urlServer1, urlServer2, urlServer2
+	}*/
+    
+    public static void main(String[] args) {
+        try {
+            Cliente c = new Cliente();
+            c.iniciar(); // Esto activa el Scanner y el bucle del teclado
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    public void iniciar() {
+        // Aquí lanzas el bucle del teclado
+        menuInteractivo();
+    }
+    
+    
+    public void menuInteractivo() {
+        Scanner sc = new Scanner(System.in);
+        String comando;
+        while (true) {
+            System.out.print("> ");
+            comando = sc.nextLine();
+            if (comando.startsWith("s") && comando.length()<2) {
+            	String res1 = target.path("info").request(MediaType.TEXT_PLAIN).get(String.class);
+            	System.out.println(res1);
+            } else if (comando.startsWith("h")) {
+            	System.out.println("Comandos disponibles: sX (propuesta), fN (fallos), s (estado), exit");
+            } else if (comando.startsWith("s")) {
+            	//Enviar propuesta
+            	String numero = comando.substring(1);
+                int valor = Integer.parseInt(numero);
+                String res1 = target.path("inicio").request(MediaType.TEXT_PLAIN).get(String.class);
+            	
+            } else if (comando.startsWith("f"))
+            {
+            	String numero = comando.substring(1);
+            	int valor = Integer.parseInt(numero);
+            	String res1 = target.path("cambio").request(MediaType.TEXT_PLAIN).get(String.class);
+            }else
+            {
+            	break;
+            }
+            
+            // ... añadir más comandos fN, etc.
+        }
+        sc.close();
+    }
+
+}
+
+
+
+//QUIERO HACER ESTO--> Server 1: Entendido --> Servers 2, 3: Entendido--> Se ponen
+
+
+
+//QUIERO HACER ESTO--> Server 1,2,3: OKEI--> Cliente de vuelta
+//Como sincronizamos
