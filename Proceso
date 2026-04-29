@@ -1,0 +1,76 @@
+package services;
+import java.util.*;
+import java.net.URI;
+
+import javax.inject.Singleton;
+import javax.ws.rs.Path;
+import javax.ws.rs.client.*;
+import javax.ws.rs.core.*;
+import java.net.URI;
+
+@Singleton
+@Path("Proceso")
+public class Proceso extends Thread {
+	
+	private int id;
+	private int variable;
+	private boolean error;
+	private Client clienteRest = ClientBuilder.newClient();
+	URI uri=UriBuilder.fromUri("http://localhost:8080/procesos/rest/Servicio").build(); // Cada proceso tendrá su servidor
+	ArrayList<Integer> compromisos = new ArrayList<Integer>();
+	ArrayList<Integer> comisiones = new ArrayList<Integer>();
+	
+	public Proceso(int id, boolean error) {
+        this.id = id;
+        this.error=error;
+    }
+	
+	public void limpiar() {
+		compromisos.clear();
+		comisiones.clear();
+		variable=-1;
+	}
+	
+	public void propuesta (int variable) {
+		//Todos deberían ya estár aqui
+		
+		//Les llega lo del Cliente
+		
+		if (error==true ) {
+			//Si hay error manda otra cosa
+			int random;
+			do {
+				random = (int)(Math.random() * 201);
+			}while(random==variable);
+			
+			compromiso(random);
+		}
+		else
+			//Si no lo hay les manda el que nos llego
+			compromiso(variable);
+				
+    }
+	
+	public void compromiso(int v) {
+		//Les envia al resto el número que el tiene
+		//Y ellos nos lo envián a nosotros
+		
+		//Vemos que número tiene mayoría y lo pasamos a comisiones
+		
+		int mayoria = 1;
+		comision(mayoria);
+		
+	}
+	
+	public void comision(int consenso) {
+		//Una vez hemos decidido que "consenso" es nuestro número se lo decimos al resto y actualizamos nuestro valor
+		//Y ellos a nosotros
+		int actualizado = 2;
+		confirmacion(actualizado);
+	}
+	
+	public void confirmacion(int actualizado) {
+		//Enviamos la info al cliente y este toma la decisión
+	}
+
+}
