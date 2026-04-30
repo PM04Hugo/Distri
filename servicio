@@ -18,11 +18,12 @@ import java.util.List;
 public class Servicio {
 	
 	private ArrayList<Proceso> miProcesos = new ArrayList<Proceso>();
+	String url="http://localhost:8080/procesos/rest/Servicio";
 
 	public Servicio() {
 		int i;
 		for (i=0; i<6; i++) {
-			miProcesos.add(new Proceso(i, false)); 
+			miProcesos.add(new Proceso(i, false, url)); 
 		}
         
     }
@@ -40,6 +41,36 @@ public class Servicio {
 		
     }
 	
+	
+	//pquorum
+	@GET
+	@Path("compromiso")
+	@Produces(MediaType.TEXT_PLAIN)
+	public synchronized void pquorum(@QueryParam("propuesta") int propuesta, @QueryParam("id") int id) {
+		
+		for(Proceso proc : miProcesos) {
+            proc.compromiso(propuesta, id);
+        }
+	}
+	
+	@GET
+    @Path("comision")
+    @Produces(MediaType.TEXT_PLAIN)
+	public synchronized void comision(@QueryParam("compromiso") int compromiso, @QueryParam("id") int id) {
+		//Creo que es asi
+		for(Proceso proc : miProcesos) {
+	        proc.comision(compromiso, id);
+	    }
+	}
+	
+	
+	@GET
+    @Path("comfirmarcion")
+    @Produces(MediaType.TEXT_PLAIN)
+	public synchronized void confirmacion(@QueryParam("comision") int comision, @QueryParam("id") int id) {
+		//Creo que es asi
+		
+	}
 	
 	@GET
     @Path("info")
