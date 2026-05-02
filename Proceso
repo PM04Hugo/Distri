@@ -73,7 +73,9 @@ public class Proceso extends Thread {
 			if (comprobar==0)
 				continue;
 			for(int j=0;j<numProcesos;j++) {
-				if (compromisos[j]==comprobar) 
+				if(compromisos[j]==0)
+					continue;
+				else if (compromisos[j]==comprobar) 
 					quorum++;
 			}
 			if(quorum>=4) {
@@ -108,7 +110,10 @@ public class Proceso extends Thread {
 
 	        quorum = 0;
 	        for(int j = 0; j < numProcesos; j++) {
-	            if (comisiones[j] == comprobar) quorum++;
+	        	if(compromisos[j]==0)
+					continue;
+				else if (compromisos[j]==comprobar) 
+					quorum++;
 	        }
 
 	        if(quorum >= 4) {
