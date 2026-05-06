@@ -1,0 +1,209 @@
+package services;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.client.*;
+import javax.ws.rs.core.*;
+import java.net.URI;
+
+import java.util.ArrayList;
+import java.util.Scanner;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+
+import java.net.InetAddress;
+
+@Path("Cliente")
+public class Cliente {
+
+    private Client clienteRest = ClientBuilder.newClient();
+    URI uri = UriBuilder.fromUri("http://localhost:8080/procesos/rest/Servicio").build();
+    WebTarget target = clienteRest.target(uri);
+    WebTarget servicios[] = new WebTarget[3];
+    
+    int servers, procesos, cont=0;
+    
+    private final ArrayList<String> cola = new ArrayList<>();
+    Scanner sc = new Scanner(System.in);
+    
+    public static void main(String[] args) {
+    	Scanner sc = new Scanner(System.in);
+        try {
+            Cliente c = new Cliente();
+            c.iniciar();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        sc.close();
+    }
+
+    public void iniciar() throws IOException {
+    	//antes que nada hacemos una comprobacion
+    	crearConfiguración();
+        Thread hiloTeclado = new Thread(() -> {
+            menuInteractivo();
+        });
+
+        Thread hiloProcesador = new Thread(() -> {
+            while (true) {
+                String comando = null;
+                synchronized (cola) {
+                    while (cola.isEmpty()) {
+                        try {
+                            cola.wait(); // espera hasta que haya algo
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                    }
+                    comando = cola.remove(0);
+                }
+
+                if (comando.equals("exit")) {
+                    System.out.println("Procesador cerrado.");
+                    break;
+                }
+                procesarComando(comando);
+            }
+        });
+
+        hiloTeclado.start();
+        hiloProcesador.start();
+
+        try {
+            hiloTeclado.join();
+            hiloProcesador.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("Cliente finalizado.");
+    }
+
+    public void menuInteractivo() {
+        String comando;
+        System.out.println("");
+        System.out.println("");
+        while (true) {
+            System.out.print("> ");
+            comando = sc.nextLine();
+            if (comando.startsWith("s") && comando.length() < 2) {
+                synchronized (cola) {
+                    cola.add(comando);
+                    cola.notify();
+                }
+            } else if (comando.startsWith("h")) {
+                System.out.println("Comandos disponibles: sX (propuesta), fN (fallos), s (estado), exit");
+            } else if (comando.startsWith("s")) {
+                synchronized (cola) {
+                    cola.add(comando);
+                    cola.notify();
+                }
+            } else if (comando.startsWith("f")) {
+                synchronized (cola) {
+                    cola.add(comando);
+                    cola.notify();
+                }
+            } else if (comando.equals("exit")) {
+                synchronized (cola) {
+                    cola.add("exit");
+                    cola.notify();
+                }
+                break;
+            } else {
+                System.out.println("Comando desconocido");
+            }
+        }
+    }
+
+    public void procesarComando(String comando) {
+        if (comando.startsWith("s") && comando.length() < 2) {
+            String res1 = target.path("info").request(MediaType.TEXT_PLAIN).get(String.class);
+            System.out.println(res1);
+
+        } else if (comando.startsWith("s")) {
+            String numero = comando.substring(1);
+            int valor = Integer.parseInt(numero);
+            String res1 = target.path("inicio").queryParam("propuesta", valor).request(MediaType.TEXT_PLAIN).get(String.class);
+            System.out.println(res1);
+
+        } else if (comando.startsWith("f")) {
+            String numero = comando.substring(1);
+            int valor = Integer.parseInt(numero);
+            String res1 = target.path("cambio").queryParam("id", valor).request(MediaType.TEXT_PLAIN).get(String.class);
+            System.out.println(res1);
+        }
+    }
+    public void crearConfiguración() throws IOException{
+        String numServers, numProcesos;
+        
+        System.out.println("Bienvenido, estimado cliente al servicio PBFT");
+	        System.out.println("Antes de comenzar por favor indique los siguientes datos");
+	        System.out.print("Número de servidores: ");
+	        numServers = sc.nextLine();
+	        System.out.print("Número de procesos: ");
+	        numProcesos = sc.nextLine();
+	    int procesos=Integer.parseInt(numProcesos);
+	    int servers=Integer.parseInt(numServers);
+	    int[] listaProcesos = new int [servers];
+        for(int i=0;i<procesos;i++) 
+        {
+        	listaProcesos[i%servers]++;
+        }
+	        
+        File f = new File("configuracion.txt");
+        if (f.createNewFile()) {
+        	
+            System.out.println("Archivo creado: " + f.getName()+ "en " + f.getAbsolutePath());
+        } else {
+            System.out.println("El archivo ya existe en "+ f.getAbsolutePath());
+        }
+        BufferedWriter bw = new BufferedWriter(new FileWriter(f.getName()));
+        bw.write(numServers+"\n");
+        bw.write(numProcesos+"\n");
+        String ip = InetAddress.getLocalHost().getHostAddress();;
+        System.out.println("IP Local: " + ip);
+        bw.write(ip+"\n");
+        for(int i=0; i<servers-1; i++) 
+        {
+        	bw.write(listaProcesos[i]+",");
+        }
+        bw.write(listaProcesos[servers-1]);
+        bw.close();
+        
+        this.servers=Integer.parseInt(numServers);
+        this.procesos=Integer.parseInt(numProcesos);
+        //sincronizar con servicio()
+    }
+    
+    @GET
+    @Path("uris")
+    public synchronized void crearUris(@QueryParam("ipServer") String ip) throws IOException, InterruptedException{
+    	BufferedWriter bw=null;
+    	File f=null;
+    	
+    	cont++;
+    	if (cont<2) {			
+    		//creamos el fichero y bw para escribir solo la primera llamada
+            f = new File("config_servers.txt");
+            if (f.createNewFile()) {
+                System.out.println("Archivo 2 creado: " + f.getName()+ "en " + f.getAbsolutePath());
+            } else {
+                System.out.println("El archivo 2 ya existe en "+ f.getAbsolutePath());
+            }  
+        }
+    	//intentamos escribir la ip
+        bw = new BufferedWriter(new FileWriter(f.getName()));
+        bw.write(ip + ","+cont+"\n");
+        if (cont < this.servers) {
+            	wait(); 
+        } else{
+            bw.close();
+            notifyAll();
+        }
+    }
+}

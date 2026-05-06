@@ -1,0 +1,200 @@
+package services;
+
+import javax.inject.Singleton;
+import java.net.URI;
+import javax.ws.rs.*;
+import javax.ws.rs.Path;
+import javax.ws.rs.client.*;
+import javax.ws.rs.core.*;
+
+import java.util.ArrayList;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+
+//ESTA ES LA CARRERA
+@Singleton
+@Path("Servicio")
+public class Servicio {
+	
+	//Esto no existirá se hara con el .txt en Servicio
+	private ArrayList<Proceso> misProcesos = new ArrayList<Proceso>();
+	private Client clienteRest = ClientBuilder.newClient();
+	
+	private int id;
+	private String ip;
+	private String ipCliente;
+	private String uriServer;
+	private int totalProcesos;
+	private int numProcesos;
+	private int numServidores;
+	private String cadenaProcesos;
+	
+	String url="http://localhost:8080/procesos/rest/Cliente";
+	URI uriCliente;
+    WebTarget Cliente;
+    WebTarget miServicio;
+	WebTarget Servicios[];
+	ArrayList<Client> clientes = new ArrayList<Client>();
+	String[] urls = new String[2];
+
+	public Servicio() throws IOException {					//al iniciar servicio primero mandaremos la ip al cliente
+		int i;												//el cliente como: mmm interesante
+		String[] partes;									//y esperamos
+		String aux;
+		try {												
+			ip = InetAddress.getLocalHost().getHostAddress();
+			System.out.println("IP server:"+ip);
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+		}
+		BufferedReader br = new BufferedReader(new FileReader("configuracion.txt"));
+		
+		//damos valor a las variables propias de servicio
+        this.numServidores = Integer.parseInt(br.readLine());
+        this.totalProcesos = Integer.parseInt(br.readLine());
+        this.ipCliente = br.readLine();
+        this.Servicios = new WebTarget[numServidores];
+        this.cadenaProcesos = br.readLine();
+        //a continuacion creamos la uri y el web target para comunicarnos con cliente
+        this.uriCliente = UriBuilder.fromUri("http://" + ipCliente + ":8080/procesos/rest/Cliente").build();
+        this.Cliente = clienteRest.target(uriCliente);
+        
+        //lo mandamos
+        Cliente.path("uris").queryParam("ipServer", ip).request().get();
+        
+		//una vez todos han mandado la ip
+        br = new BufferedReader(new FileReader("configuracion.txt"));
+        aux = br.readLine();
+        partes = aux.split(",");
+        String ipServer=partes[0];
+        if(ip.equals(ipServer)) {																			//es él mismo 
+        	this.id=Integer.parseInt(partes[1]);
+        	this.uriServer="http://"+this.ip+":8080/procesos/rest/Servicio";								//uris para comunicarse con sus procesos
+        	Servicios[id]= clienteRest.target(uriServer);
+        	miServicio=clienteRest.target(uriServer);
+
+        }else {
+        	int idServer=Integer.parseInt(partes[1]);
+        	Servicios[idServer]= clienteRest.target("http://"+ipServer+":8080/procesos/rest/Servicio");		//uris para comunicarse con otros servicios
+        }
+        br.close();
+        /*	basicamente en cliente dividimos los procesos de forma equitativa y lo convertimos en una cadena de numeros
+         * 	ej: 6 proceso 4 servidores -> listaProcesos[4]= {2,2,1,1}  -> "2,2,1,1"
+         * 	con el id (1/2/3/4)- 1 pillamos el que es nuestro                ^
+         */
+        partes = cadenaProcesos.split(",");
+        this.numProcesos=Integer.parseInt(partes[id-1]);
+		
+        //creamos nuestros procesos
+		for (i=0; i<numProcesos; i++) {
+			misProcesos.add(new Proceso(i, false, uriServer)); 												//se lo enviamos a los procesos
+		}
+		/*
+		for (int i; i<2; i++) {
+			clientes.add( ClientBuilder.newClient());
+			URI uri=UriBuilder.fromUri(urls[i]).build(); //urlServer1, urlServer2, urlServer2
+			servicios[i]=clienteRest.target(uri);
+		}
+		*/
+    }
+	
+	@GET
+    @Path("inicio")
+    @Produces(MediaType.TEXT_PLAIN)							//aqui no se comunican con otros servicios
+	public synchronized String inicio(int propuesta) {
+		String s="s";
+		for(Proceso proc : misProcesos) {
+            proc.propuesta(propuesta);
+        }
+		return s;
+    }
+	
+	
+	//pquorum
+	@GET
+	@Path("compromiso")
+	@Produces(MediaType.TEXT_PLAIN)
+	public synchronized void pquorum(@QueryParam("propuesta") int vCompromiso, @QueryParam("id") int id) {
+		//mandamos a nuestros procesos
+		for(Proceso proc : misProcesos) {					//obviamos el proceso que llama a la funcion. asi eliminamod un bucle de cada proceso
+			if(proc.getIdProceso()!= id) {
+	            proc.compromiso(vCompromiso, id);
+			}
+        }
+		//mandamos a los otros servers
+		for (WebTarget s : Servicios)
+		{
+			if(!s.getUri().toString().equals(miServicio.getUri().toString()))	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
+			{
+				s.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("id", id).request().get();
+			}	 
+		}
+	}
+	
+	@GET
+    @Path("comision")
+    @Produces(MediaType.TEXT_PLAIN)
+	public synchronized void comision(@QueryParam("compromiso") int vComision, @QueryParam("id") int id) {
+		//Creo que es asi
+		for(Proceso proc : misProcesos) {		//obviamos el proceso que llama a la funcion. asi eliminamod un bucle de cada proceso
+			if(proc.getIdProceso()!= id) {
+	            proc.comision(vComision, id);
+			}
+        }
+		//mandamos a los otros servers
+		for (WebTarget s : Servicios)
+		{
+			if(!s.getUri().toString().equals(miServicio.getUri().toString()))	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
+			{
+				s.path("comision").queryParam("compromiso", vComision).queryParam("id", id).request().get();
+			}
+		}
+	}
+	
+	
+	@GET
+    @Path("comfirmarcion")
+    @Produces(MediaType.TEXT_PLAIN)
+	public synchronized int confirmacion(@QueryParam("comision") int comision, @QueryParam("id") int id) {
+		//Creo que es asi
+		//Hay dos opciones
+		//Se lo envia todo uno, buscan la url del server central y le envia la info
+		
+		//Server central:
+		/*
+		  for()
+		  	Comprueba que no haya 0 si no los hoy lo madanda, si lo hay es que falta un server por mandar toda su info
+		 */
+		
+		//Si no hay central
+		/*
+		  Hacemos como los procesos le hacian a los servicios, le envian al cliente lo que tienen, y el cliente mira si hay quorum cada vez
+		 */
+		
+		return comision;
+	}
+	
+	@GET
+    @Path("info")
+    @Produces(MediaType.TEXT_PLAIN)
+	public synchronized String info() {
+		String s="s";
+		
+		return s;
+		
+    }
+	
+	public synchronized  String cambio(int id) {
+		String s="s";
+		
+		return s;
+	}
+}
