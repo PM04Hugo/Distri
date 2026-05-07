@@ -12,19 +12,23 @@ import javax.ws.rs.core.*;
 @Path("Proceso")
 public class Proceso extends Thread {
 	
-	static int numProcesos=6;
 	private int id, vCompromiso, vComision, vConfirmacion;
 	private int procesosCompromiso=0, procesosComision=0;
+	private int numProcesos;
 	private boolean error;
 	WebTarget Server;
 	private Client clienteRest = ClientBuilder.newClient();
 	URI uri=UriBuilder.fromUri("http://localhost:8080/procesos/rest/Servicio").build(); // Cada proceso tendrá su servidor
-	int compromisos[] = new int[numProcesos];
-	int comisiones[] = new int[numProcesos];
+	int compromisos[]; 
+	int comisiones[];
 	
-	public Proceso(int id, boolean error, String url) {
+	public Proceso(int id, boolean error, String url, int numProcesos) {
         this.id = id;
         this.error=error;
+		this.numProcesos = numProcesos;
+		this.compromisos = new int[numProcesos];   
+		this.comisiones  = new int[numProcesos];
+
         URI uri=UriBuilder.fromUri(url).build();
         this.Server = clienteRest.target(uri);
     }
@@ -119,7 +123,7 @@ public class Proceso extends Thread {
 	    comisiones[id] = compromiso;
 	    int quorum = 0;
 	    procesosComision++;
-	    if(procesosComision>numProcesos)
+	    if(procesosComision>numProcesos/2)
 	    {
 		    for(int i = 0; i < numProcesos; i++) {
 		        if (comisiones[i] == 0) continue;
@@ -156,6 +160,9 @@ public class Proceso extends Thread {
 	}*/
 	
 	public void confirmacion(int actualizado) {
+		
+	}
+	public String estado() {
 		
 	}
 

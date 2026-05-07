@@ -55,37 +55,50 @@ public class Servicio {
 		catch(Exception e) {
 			e.printStackTrace();
 		}
-		BufferedReader br = new BufferedReader(new FileReader("configuracion.txt"));
+		try{
+			BufferedReader br = new BufferedReader(new FileReader("configuracion.txt"));
 		
-		//damos valor a las variables propias de servicio
-        this.numServidores = Integer.parseInt(br.readLine());
-        this.totalProcesos = Integer.parseInt(br.readLine());
-        this.ipCliente = br.readLine();
-        this.Servicios = new WebTarget[numServidores];
-        this.cadenaProcesos = br.readLine();
-        //a continuacion creamos la uri y el web target para comunicarnos con cliente
-        this.uriCliente = UriBuilder.fromUri("http://" + ipCliente + ":8080/procesos/rest/Cliente").build();
-        this.Cliente = clienteRest.target(uriCliente);
-        
-        //lo mandamos
-        Cliente.path("uris").queryParam("ipServer", ip).request().get();
+			//damos valor a las variables propias de servicio
+			this.numServidores = Integer.parseInt(br.readLine());
+			this.totalProcesos = Integer.parseInt(br.readLine());
+			this.ipCliente = br.readLine();
+			this.Servicios = new WebTarget[numServidores];
+			this.cadenaProcesos = br.readLine();
+			//a continuacion creamos la uri y el web target para comunicarnos con cliente
+			this.uriCliente = UriBuilder.fromUri("http://" + ipCliente + ":8080/procesos/rest/Cliente").build();
+			this.Cliente = clienteRest.target(uriCliente);
+			
+			//lo mandamos
+			Cliente.path("uris").queryParam("ipServer", ip).request().get();
+			br.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
         
 		//una vez todos han mandado la ip
-        br = new BufferedReader(new FileReader("configuracion.txt"));
-        aux = br.readLine();
-        partes = aux.split(",");
-        String ipServer=partes[0];
-        if(ip.equals(ipServer)) {																			//es él mismo 
-        	this.id=Integer.parseInt(partes[1]);
-        	this.uriServer="http://"+this.ip+":8080/procesos/rest/Servicio";								//uris para comunicarse con sus procesos
-        	Servicios[id]= clienteRest.target(uriServer);
-        	miServicio=clienteRest.target(uriServer);
+		try{
+			br = new BufferedReader(new FileReader("config_servers.txt"));
+			while ((linea = br.readLine()) != null) {	
+				aux = br.readLine();
+				partes = aux.split(",");
+				String ipServer=partes[0];
+				if(ip.equals(ipServer)) {																			//es él mismo 
+					this.id=Integer.parseInt(partes[1]);
+					this.uriServer="http://"+this.ip+":8080/procesos/rest/Servicio";								//uris para comunicarse con sus procesos
+					Servicios[id]= clienteRest.target(uriServer);
+					miServicio=clienteRest.target(uriServer);
 
-        }else {
-        	int idServer=Integer.parseInt(partes[1]);
-        	Servicios[idServer]= clienteRest.target("http://"+ipServer+":8080/procesos/rest/Servicio");		//uris para comunicarse con otros servicios
-        }
-        br.close();
+				}else {
+					int idServer=Integer.parseInt(partes[1]);
+					Servicios[idServer]= clienteRest.target("http://"+ipServer+":8080/procesos/rest/Servicio");		//uris para comunicarse con otros servicios
+				}
+			}
+			br.close();	
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+        
         /*	basicamente en cliente dividimos los procesos de forma equitativa y lo convertimos en una cadena de numeros
          * 	ej: 6 proceso 4 servidores -> listaProcesos[4]= {2,2,1,1}  -> "2,2,1,1"
          * 	con el id (1/2/3/4)- 1 pillamos el que es nuestro                ^
@@ -95,7 +108,7 @@ public class Servicio {
 		
         //creamos nuestros procesos
 		for (i=0; i<numProcesos; i++) {
-			misProcesos.add(new Proceso(i, false, uriServer)); 												//se lo enviamos a los procesos
+			misProcesos.add(new Proceso(i, false, uriServer, totalProcesos)); 												//se lo enviamos a los procesos
 		}
 		/*
 		for (int i; i<2; i++) {
@@ -105,11 +118,12 @@ public class Servicio {
 		}
 		*/
     }
-	
+
+
 	@GET
     @Path("inicio")
     @Produces(MediaType.TEXT_PLAIN)							//aqui no se comunican con otros servicios
-	public synchronized String inicio(int propuesta) {
+	public synchronized String inicio(@QueryParam("propuesta") int propuesta) {
 		String s="s";
 		for(Proceso proc : misProcesos) {
             proc.propuesta(propuesta);
@@ -187,14 +201,24 @@ public class Servicio {
     @Produces(MediaType.TEXT_PLAIN)
 	public synchronized String info() {
 		String s="s";
-		
 		return s;
-		
     }
-	
-	public synchronized  String cambio(int id) {
+
+	@GET
+    @Path("actualizacion")
+	public synchronized  String actualizacion(int id) {
 		String s="s";
 		
 		return s;
 	}
+
+	@GET
+    @Path("estado")
+    @Produces(MediaType.TEXT_PLAIN)
+	public synchronized String estado() {
+		String s="s";
+		
+		return s;
+		
+    }
 }

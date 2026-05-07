@@ -1,4 +1,5 @@
 package services;
+
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
@@ -28,6 +29,7 @@ public class Cliente {
     int servers, procesos, cont=0;
     
     private final ArrayList<String> cola = new ArrayList<>();
+    private Object lock = new Object();
     Scanner sc = new Scanner(System.in);
     
     public static void main(String[] args) {
@@ -139,20 +141,29 @@ public class Cliente {
         }
     }
     public void crearConfiguración() throws IOException{
-        String numServers, numProcesos;
+        int numServers, numProcesos; 
         
         System.out.println("Bienvenido, estimado cliente al servicio PBFT");
 	        System.out.println("Antes de comenzar por favor indique los siguientes datos");
 	        System.out.print("Número de servidores: ");
-	        numServers = sc.nextLine();
+	        while (!sc.hasNextInt()) {
+                System.out.println("Introduce un número válido:");
+            } 
+            numServers = sc.nextInt();
 	        System.out.print("Número de procesos: ");
-	        numProcesos = sc.nextLine();
+            while (!sc.hasNextInt()) {
+                System.out.println("Introduce un número válido:");
+            } 
+	        numProcesos = sc.nextInt();
 	    int procesos=Integer.parseInt(numProcesos);
 	    int servers=Integer.parseInt(numServers);
-	    int[] listaProcesos = new int [servers];
-        for(int i=0;i<procesos;i++) 
-        {
-        	listaProcesos[i%servers]++;
+	    String[] listaProcesos = new String[servers];
+        for(int i = 0; i < procesos; i++) {
+            if(listaProcesos[i%servers] == null) {
+                listaProcesos[i%servers] = "" + i;
+            } else {
+                listaProcesos[i%servers] += "," + i;
+            }
         }
 	        
         File f = new File("configuracion.txt");
@@ -162,48 +173,52 @@ public class Cliente {
         } else {
             System.out.println("El archivo ya existe en "+ f.getAbsolutePath());
         }
-        BufferedWriter bw = new BufferedWriter(new FileWriter(f.getName()));
-        bw.write(numServers+"\n");
-        bw.write(numProcesos+"\n");
-        String ip = InetAddress.getLocalHost().getHostAddress();;
-        System.out.println("IP Local: " + ip);
-        bw.write(ip+"\n");
-        for(int i=0; i<servers-1; i++) 
-        {
-        	bw.write(listaProcesos[i]+",");
-        }
-        bw.write(listaProcesos[servers-1]);
-        bw.close();
+        try{
+            BufferedWriter bw = new BufferedWriter(new FileWriter(f.getName()));
+            bw.write(numServers+"\n");
+            bw.write(numProcesos+"\n");
+            String ip = InetAddress.getLocalHost().getHostAddress();;
+            System.out.println("IP Local: " + ip);
+            bw.write(ip+"\n");
+            for(int i=0; i<servers-1; i++) 
+            {
+                bw.write(listaProcesos[i]+",");
+            }
+            bw.write(listaProcesos[servers-1]);
+            bw.close();
+            
+            this.servers=Integer.parseInt(numServers);
+            this.procesos=Integer.parseInt(numProcesos);    
         
-        this.servers=Integer.parseInt(numServers);
-        this.procesos=Integer.parseInt(numProcesos);
+        } catch (Exception e) {
+                e.printStackTrace();
+        }
         //sincronizar con servicio()
     }
     
     @GET
     @Path("uris")
-    public synchronized void crearUris(@QueryParam("ipServer") String ip) throws IOException, InterruptedException{
+    public void crearUris(@QueryParam("ipServer") String ip) throws IOException, InterruptedException{
     	BufferedWriter bw=null;
     	File f=null;
-    	
-    	cont++;
-    	if (cont<2) {			
-    		//creamos el fichero y bw para escribir solo la primera llamada
+    	synchronized(lock){
+            cont++;
             f = new File("config_servers.txt");
-            if (f.createNewFile()) {
-                System.out.println("Archivo 2 creado: " + f.getName()+ "en " + f.getAbsolutePath());
-            } else {
-                System.out.println("El archivo 2 ya existe en "+ f.getAbsolutePath());
-            }  
+            //intentamos escribir la ip
+            try{
+                bw = new BufferedWriter(new FileWriter(f.getName(),true));
+                bw.write(ip + ","+cont+"\n");
+                if (cont < this.servers) {
+                    lock.wait(); 
+                } else{
+                    lock.notifyAll();
+                }
+                bw.close();    
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            
         }
-    	//intentamos escribir la ip
-        bw = new BufferedWriter(new FileWriter(f.getName()));
-        bw.write(ip + ","+cont+"\n");
-        if (cont < this.servers) {
-            	wait(); 
-        } else{
-            bw.close();
-            notifyAll();
-        }
+    	
     }
 }
