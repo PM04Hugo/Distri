@@ -12,7 +12,7 @@ import javax.ws.rs.core.*;
 @Path("Proceso")
 public class Proceso extends Thread {
 	
-	private int id, vCompromiso, vComision, vConfirmacion;
+	private int id, valor, vCompromiso, vComision, vConfirmacion;
 	private int procesosCompromiso=0, procesosComision=0;
 	private int numProcesos;
 	private boolean error;
@@ -69,6 +69,7 @@ public class Proceso extends Thread {
 			procesosCompromiso++;
 			vCompromiso=variable;
 		}
+		this.valor=vCompromiso;
 		Server.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("id", this.id).request().get();
 				
     }
@@ -106,20 +107,16 @@ public class Proceso extends Thread {
 		}
 	}
 		
-		
-		
 				//EN la lista hay numero para el queorum?
 					//SI
 						//Manda mensaje al server para pasar a la siguiente fase
 					//NO
 					
-	
-	
 	public void comision(int compromiso , int id) {
 		//Les envia al resto el número que el tiene
 		//Y ellos nos lo envián a nosotros
-		
 		//Vemos que número tiene mayoría y lo pasamos a comisiones
+
 	    comisiones[id] = compromiso;
 	    int quorum = 0;
 	    procesosComision++;
@@ -163,7 +160,24 @@ public class Proceso extends Thread {
 		
 	}
 	public String estado() {
-		
+		String aux, sError;
+		String sCompromisos=null;
+		for(int i =0; i<num_procesos;i++)
+		{
+			aux=compromisos[i]+"";
+			if(sCompromisos == null) {
+                sCompromisos= aux;
+            } else {
+                sCompromisos=sCompromisos+","+aux;
+            }
+		}
+		if (error)				//si error es true
+		{
+			sError="true"
+		}
+		sError = "false";
+		return (id+"/"+valor+"/"+sCompromisos+"/"+sError);
+
 	}
 
 }

@@ -35,7 +35,8 @@ public class Servicio {
 	private int numProcesos;
 	private int numServidores;
 	private String cadenaProcesos;
-	
+	private ArrayList <Integer> misProcesos = new ArrayList <>();	
+
 	String url="http://localhost:8080/procesos/rest/Cliente";
 	URI uriCliente;
     WebTarget Cliente;
@@ -46,7 +47,7 @@ public class Servicio {
 
 	public Servicio() throws IOException {					//al iniciar servicio primero mandaremos la ip al cliente
 		int i;												//el cliente como: mmm interesante
-		String[] partes;									//y esperamos
+		String[] partes, partes1, partes2;									//y esperamos
 		String aux;
 		try {												
 			ip = InetAddress.getLocalHost().getHostAddress();
@@ -103,12 +104,16 @@ public class Servicio {
          * 	ej: 6 proceso 4 servidores -> listaProcesos[4]= {2,2,1,1}  -> "2,2,1,1"
          * 	con el id (1/2/3/4)- 1 pillamos el que es nuestro                ^
          */
-        partes = cadenaProcesos.split(",");
-        this.numProcesos=Integer.parseInt(partes[id-1]);
+
+		/* esta cambiado, ahora cadena procesos tiene "1,5;2,6;3;4" siendo 1,5 lo que tenemos que pillar */
+        partes1 = cadenaProcesos.split(";");
+        this.numProcesos= partes1.length;
+		partes2 = partes1[id-1].split(";");				//es id-1 porq los servers empiezan desde 1
+		//numProcesos=Integer.parseInt(partes1[id-1]);
 		
         //creamos nuestros procesos
 		for (i=0; i<numProcesos; i++) {
-			misProcesos.add(new Proceso(i, false, uriServer, totalProcesos)); 												//se lo enviamos a los procesos
+			misProcesos.add(new Proceso(partes2[i], false, uriServer, totalProcesos)); 												//se lo enviamos a los procesos
 		}
 		/*
 		for (int i; i<2; i++) {
@@ -158,7 +163,7 @@ public class Servicio {
     @Produces(MediaType.TEXT_PLAIN)
 	public synchronized void comision(@QueryParam("compromiso") int vComision, @QueryParam("id") int id) {
 		//Creo que es asi
-		for(Proceso proc : misProcesos) {		//obviamos el proceso que llama a la funcion. asi eliminamod un bucle de cada proceso
+		for(Proceso proc : misProcesos) {				//obviamos el proceso que llama a la funcion. asi eliminamod un bucle de cada proceso
 			if(proc.getIdProceso()!= id) {
 	            proc.comision(vComision, id);
 			}
@@ -175,7 +180,7 @@ public class Servicio {
 	
 	
 	@GET
-    @Path("comfirmarcion")
+    @Path("confirmarcion")
     @Produces(MediaType.TEXT_PLAIN)
 	public synchronized int confirmacion(@QueryParam("comision") int comision, @QueryParam("id") int id) {
 		//Creo que es asi
@@ -216,9 +221,35 @@ public class Servicio {
     @Path("estado")
     @Produces(MediaType.TEXT_PLAIN)
 	public synchronized String estado() {
-		String s="s";
-		
-		return s;
-		
+		String sEstado=null;
+		String aux;
+		for (Proceso proc : misProcesos)
+		{
+			String sEstado=
+			aux=proc.estado();
+			if(sEstado == null) {
+                sEstado= aux;
+            } else {
+                sEstado=sEstado+";"+aux;
+            }
+		}
+		return sEstado;
     }
+
+	@GET
+    @Path("fallo")
+	public synchronized void actualizacion(int id) {
+		for (Proceso proc : misProcesos)
+		{
+			if (proc.id==id)
+			{
+				if(proc.error)
+				{
+					proc.error=false;
+				} else {
+					proc.error=true
+				}
+			}
+		}
+	}
 }

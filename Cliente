@@ -17,6 +17,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 
 import java.net.InetAddress;
+import java.util.Collections;
 
 @Path("Cliente")
 public class Cliente {
@@ -28,6 +29,7 @@ public class Cliente {
     
     int servers, procesos, cont=0;
     
+    private ArrayList<String> listaEstados = new ArrayList<>();
     private final ArrayList<String> cola = new ArrayList<>();
     private Object lock = new Object();
     Scanner sc = new Scanner(System.in);
@@ -124,8 +126,38 @@ public class Cliente {
 
     public void procesarComando(String comando) {
         if (comando.startsWith("s") && comando.length() < 2) {
-            String res1 = target.path("info").request(MediaType.TEXT_PLAIN).get(String.class);
-            System.out.println(res1);
+            String res1;
+            String partes,partes0;
+            for(int i=0;i<procesos; i++)
+            {
+                res1 = servicios[i].path("estado").request(MediaType.TEXT_PLAIN).get(String.class);
+            }
+            partes0 = res1.split(";");
+            for(int i=0;i<partes0.length;i++)
+            {
+                listaEstados.add(partes0[i]);
+            }   
+
+            Collections.sort(listaEstados, (a, b) -> {          //ordenamos por el id
+                int aux1 = Integer.parseInt(
+                    a.substring(0, a.indexOf('.'))
+                );
+                int aux2 = Integer.parseInt(
+                    b.substring(0, b.indexOf('.'))
+                );
+                return Integer.compare(aux1, aux2);
+            });
+            System.out.printf("---------------------------------");
+            System.out.printf("             PBFT                ");
+            System.out.printf("---------------------------------");
+            System.out.println(" id\t| var\t| compromisos\t| error\t |");
+            for (String s: listaEstados)
+            {
+                partes = aux.split("/");
+                System.out.println(" %d\t| %s\t| %s\t| %s\t |", Integer.parseInt(partes[0]), partes[1], partes[2], partes[3]);
+            }
+            System.out.println("---------------------------------");
+            
 
         } else if (comando.startsWith("s")) {
             String numero = comando.substring(1);
@@ -136,7 +168,7 @@ public class Cliente {
         } else if (comando.startsWith("f")) {
             String numero = comando.substring(1);
             int valor = Integer.parseInt(numero);
-            String res1 = target.path("cambio").queryParam("id", valor).request(MediaType.TEXT_PLAIN).get(String.class);
+            String res1 = target.path("fallo").queryParam("id", valor).request(MediaType.TEXT_PLAIN).get(String.class);
             System.out.println(res1);
         }
     }
@@ -155,14 +187,33 @@ public class Cliente {
                 System.out.println("Introduce un número válido:");
             } 
 	        numProcesos = sc.nextInt();
-	    int procesos=Integer.parseInt(numProcesos);
-	    int servers=Integer.parseInt(numServers);
+	        procesos=numProcesos;
+	        servers=numServers;
+
+            /*
+            *   aqui basicamente estamos repartiendo todos los ids de manera equitativa con el %
+            *   los ponemos en un array de strings [ej] : [1,4,7] [2,5,8] [3,6,9] para 3 servidores 9 procesos
+            *   a continuacion creamos la super duper string que separa:
+            *       "," los procesos de un mismo servidor 
+            *       ";" los procesos de cada servidor
+            *       [ej] : 1,4,7;2,5,8;3,6,9
+            */
+
 	    String[] listaProcesos = new String[servers];
+        String cadenaProcesos=null;
         for(int i = 0; i < procesos; i++) {
             if(listaProcesos[i%servers] == null) {
                 listaProcesos[i%servers] = "" + i;
             } else {
                 listaProcesos[i%servers] += "," + i;
+            }
+        }
+        for(int i = 0; i < procesos; i++)
+        {
+            if(cadenaProcesos == null) {
+                cadenaProcesos = listaProcesos[i];
+            } else {
+                cadenaProcesos += ";" + listaProcesos[i];
             }
         }
 	        
@@ -180,10 +231,7 @@ public class Cliente {
             String ip = InetAddress.getLocalHost().getHostAddress();;
             System.out.println("IP Local: " + ip);
             bw.write(ip+"\n");
-            for(int i=0; i<servers-1; i++) 
-            {
-                bw.write(listaProcesos[i]+",");
-            }
+            bw.write(cadenaProcesos);
             bw.write(listaProcesos[servers-1]);
             bw.close();
             
