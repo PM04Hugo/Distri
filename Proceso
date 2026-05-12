@@ -18,7 +18,6 @@ public class Proceso extends Thread {
 	private boolean error;
 	WebTarget Server;
 	private Client clienteRest = ClientBuilder.newClient();
-	URI uri=UriBuilder.fromUri("http://localhost:8080/procesos/rest/Servicio").build(); // Cada proceso tendrá su servidor
 	int compromisos[]; 
 	int comisiones[];
 	
@@ -28,7 +27,6 @@ public class Proceso extends Thread {
 		this.numProcesos = numProcesos;
 		this.compromisos = new int[numProcesos];   
 		this.comisiones  = new int[numProcesos];
-
         URI uri=UriBuilder.fromUri(url).build();
         this.Server = clienteRest.target(uri);
     }

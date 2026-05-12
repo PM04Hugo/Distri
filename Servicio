@@ -8,6 +8,7 @@ import javax.ws.rs.client.*;
 import javax.ws.rs.core.*;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
@@ -39,81 +40,60 @@ public class Servicio {
 
 	String url="http://localhost:8080/procesos/rest/Cliente";
 	URI uriCliente;
-    WebTarget Cliente;
+    //WebTarget Cliente;
     WebTarget miServicio;
-	WebTarget Servicios[];
-	ArrayList<Client> clientes = new ArrayList<Client>();
-	String[] urls = new String[2];
+	List <WebTarget> Servicios = new ArrayList<>();
+	
+	//ArrayList<Client> clientes = new ArrayList<Client>();
+	//String[] urls = new String[2];
 	String RUTA = System.getProperty("user.home");
 
 	public Servicio() throws IOException {					//al iniciar servicio primero mandaremos la ip al cliente
 		int i;												//el cliente como: mmm interesante
-		String[] partes, partes1, partes2;									//y esperamos
 		String aux;
 		try {												
-			ip = InetAddress.getLocalHost().getHostAddress();
+			this.ip = InetAddress.getLocalHost().getHostAddress();
 			System.out.println("IP server:"+ip);
 		}
 		catch(Exception e) {
 			e.printStackTrace();
 		}
-		try{
-			BufferedReader br = new BufferedReader(new FileReader(RUTA+"/configuracion.txt"));
-		
-			/*damos valor a las variables propias de servicio
-			 *	1.linea numero de servidores
-			 * 	2.linea numero total procesos
-			 * 	3.linea ip cliente
-			 * 	4.cadena concatenada de procesos	"1,4,7;2,5,8;3,6,9"
-			 */
-			this.numServidores = Integer.parseInt(br.readLine());
-			this.totalProcesos = Integer.parseInt(br.readLine());
-			this.ipCliente = br.readLine();
-			this.Servicios = new WebTarget[numServidores];
-			this.cadenaProcesos = br.readLine();
-			//a continuacion creamos la uri y el web target para comunicarnos con cliente
-			this.uriCliente = UriBuilder.fromUri("http://" + ipCliente + ":8080/procesos/rest/Cliente").build();
-			this.Cliente = clienteRest.target(uriCliente);
-			
-			System.out.println("numservs: "+numServidores+ ", totalProcesos: " +totalProcesos+ ", ipCliente: " +ipCliente+ ", cadenaProcesos: " +cadenaProcesos);
-			//lo mandamos
-			Cliente.path("uris").queryParam("ipServer", ip).request().get();
-			br.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-        
-		//una vez todos han mandado la ip
-		try{
-			BufferedReader br = new BufferedReader(new FileReader(RUTA+"/config_servers.txt"));
-			String linea;
-			while ((linea = br.readLine()) != null) {	
-				partes = linea.split(",");
-				String ipServer=partes[0];
-				if(ip.equals(ipServer)) {																			//es él mismo 
-					this.id=Integer.parseInt(partes[1]);
-					this.uriServer="http://"+this.ip+":8080/procesos/rest/Servicio";								//uris para comunicarse con sus procesos
-					Servicios[id]= clienteRest.target(uriServer);
-					miServicio=clienteRest.target(uriServer);
-					System.out.println("MI id["+id+"] MI uri:"+uriServer);
+    }
 
-				}else {
-					int idServer=Integer.parseInt(partes[1]);
-					Servicios[idServer]= clienteRest.target("http://"+ipServer+":8080/procesos/rest/Servicio");		//uris para comunicarse con otros servicios
-					System.out.println("id["+idServer+"] ip:"+ipServer);
-				}
+	@GET
+    @Path("configuracion")
+	public synchronized void configuracion(@QueryParam("ips") String ipServers, @QueryParam("cadenaProcesos") String cadenaProcesos, @QueryParam("totalProcesos") int totalProcesos) {
+		String[] partes, partes1, partes2;	
+		
+		/*
+		 * 	con total procesos pasamos todos los procesos
+		 * 	con ipServers pillamos las ips que van concatenadas y las metemos en el array partes
+		 * 	sacamos cantidad de servidores con partes.length
+		 * 	sacamos nuestra ip
+		 */
+		
+		partes = ipServers.split(",");
+		this.numServidores = partes.length;
+		this.totalProcesos = totalProcesos;
+		for(int i=0;i<partes.length;i++) 
+		{
+			if(ip.equals(partes[i])) {																			//es él mismo 
+				this.id=i;
+				this.uriServer="http://"+this.ip+":8080/procesos/rest/Servicio";								//uris para comunicarse con sus procesos
+				miServicio=clienteRest.target(uriServer);
+				System.out.println("MI id["+id+"] MI uri:"+uriServer);
+			}else {
+				int idServer=Integer.parseInt(partes[1]);
+				Servicios.add(clienteRest.target("http://"+partes[i]+":8080/procesos/rest/Servicio"));		//uris para comunicarse con otros servicios
+				System.out.println("id["+idServer+"] ip:"+partes[i]);
 			}
-			br.close();	
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-        
-        /*	basicamente en cliente dividimos los procesos de forma equitativa y lo convertimos en una cadena de numeros
-         * 	ej: 6 proceso 4 servidores -> listaProcesos[4]= {2,2,1,1}  -> "2,2,1,1"
-         * 	con el id (1/2/3/4)- 1 pillamos el que es nuestro                ^
-         */
-
+		}		
+	    
+	    /*	basicamente en cliente dividimos los procesos de forma equitativa y lo convertimos en una cadena de numeros
+	     * 	ej: 6 proceso 4 servidores -> listaProcesos[4]= {2,2,1,1}  -> "2,2,1,1"
+	     * 	con el id (1/2/3/4)- 1 pillamos el que es nuestro                ^
+	     */
+	
 		/* esta cambiado, ahora cadena procesos tiene "1,5;2,6;3;4" siendo 1,5 lo que tenemos que pillar */
 	        //partes1 = cadenaProcesos.split(";");
 	        //this.numProcesos= partes1.length;
@@ -123,21 +103,12 @@ public class Servicio {
 		this.numProcesos = partes2.length;
 		//numProcesos=Integer.parseInt(partes1[id-1]);
 		
-        //creamos nuestros procesos
-		for (i=0; i<numProcesos; i++) {
+	    //creamos nuestros procesos
+		for (int i=0; i<numProcesos; i++) {
 			System.out.println("proceso "+partes2[i]+"creado");
 			misProcesos.add(new Proceso(Integer.parseInt(partes2[i]), false, uriServer, totalProcesos)); 												//se lo enviamos a los procesos
 		}
-		/*
-		for (int i; i<2; i++) {
-			clientes.add( ClientBuilder.newClient());
-			URI uri=UriBuilder.fromUri(urls[i]).build(); //urlServer1, urlServer2, urlServer2
-			servicios[i]=clienteRest.target(uri);
-		}
-		*/
-    }
-
-
+	}
 	@GET
     @Path("inicio")
     @Produces(MediaType.TEXT_PLAIN)							//aqui no se comunican con otros servicios
