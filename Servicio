@@ -58,7 +58,7 @@ public class Servicio {
 			e.printStackTrace();
 		}
 		try{
-			BufferedReader br = new BufferedReader(new FileReader("configuracion.txt"));
+			BufferedReader br = new BufferedReader(new FileReader(RUTA+"/configuracion.txt"));
 		
 			/*damos valor a las variables propias de servicio
 			 *	1.linea numero de servidores
@@ -75,6 +75,7 @@ public class Servicio {
 			this.uriCliente = UriBuilder.fromUri("http://" + ipCliente + ":8080/procesos/rest/Cliente").build();
 			this.Cliente = clienteRest.target(uriCliente);
 			
+			System.out.println("numservs: "+numServidores+ ", totalProcesos: " +totalProcesos+ ", ipCliente: " +ipCliente+ ", cadenaProcesos: " +cadenaProcesos);
 			//lo mandamos
 			Cliente.path("uris").queryParam("ipServer", ip).request().get();
 			br.close();
@@ -95,10 +96,12 @@ public class Servicio {
 					this.uriServer="http://"+this.ip+":8080/procesos/rest/Servicio";								//uris para comunicarse con sus procesos
 					Servicios[id]= clienteRest.target(uriServer);
 					miServicio=clienteRest.target(uriServer);
+					System.out.println("MI id["+id+"] MI uri:"+uriServer);
 
 				}else {
 					int idServer=Integer.parseInt(partes[1]);
 					Servicios[idServer]= clienteRest.target("http://"+ipServer+":8080/procesos/rest/Servicio");		//uris para comunicarse con otros servicios
+					System.out.println("id["+idServer+"] ip:"+ipServer);
 				}
 			}
 			br.close();	
@@ -112,13 +115,17 @@ public class Servicio {
          */
 
 		/* esta cambiado, ahora cadena procesos tiene "1,5;2,6;3;4" siendo 1,5 lo que tenemos que pillar */
-        partes1 = cadenaProcesos.split(";");
-        this.numProcesos= partes1.length;
-		partes2 = partes1[id].split(";");				//es id-1 porq los servers empiezan desde 1
+	        //partes1 = cadenaProcesos.split(";");
+	        //this.numProcesos= partes1.length;
+			//partes2 = partes1[id].split(",");				//ya no es id-1 porq los servers empiezan desde 0
+		partes1 = cadenaProcesos.split(";");
+		partes2 = partes1[id].split(",");
+		this.numProcesos = partes2.length;
 		//numProcesos=Integer.parseInt(partes1[id-1]);
 		
         //creamos nuestros procesos
 		for (i=0; i<numProcesos; i++) {
+			System.out.println("proceso "+partes2[i]+"creado");
 			misProcesos.add(new Proceso(Integer.parseInt(partes2[i]), false, uriServer, totalProcesos)); 												//se lo enviamos a los procesos
 		}
 		/*
@@ -138,6 +145,7 @@ public class Servicio {
 		String s="s";
 		for(Proceso proc : misProcesos) {
             proc.propuesta(propuesta);
+            System.out.println(proc.getIdProceso()+" llegue :3 a propuesta desde servicio "+id);
         }
 		return s;
     }
@@ -147,11 +155,11 @@ public class Servicio {
 	@GET
 	@Path("compromiso")
 	@Produces(MediaType.TEXT_PLAIN)
-	public synchronized void pquorum(@QueryParam("propuesta") int vCompromiso, @QueryParam("id") int id) {
+	public synchronized void pquorum(@QueryParam("propuesta") int vCompromiso, @QueryParam("pid") int pid) {
 		//mandamos a nuestros procesos
 		for(Proceso proc : misProcesos) {					//obviamos el proceso que llama a la funcion. asi eliminamod un bucle de cada proceso
-			if(proc.getIdProceso()!= id) {
-	            proc.compromiso(vCompromiso, id);
+			if(proc.getIdProceso()!= pid) {
+	            proc.compromiso(vCompromiso, pid);
 			}
         }
 		//mandamos a los otros servers
@@ -159,7 +167,8 @@ public class Servicio {
 		{
 			if(!s.getUri().toString().equals(miServicio.getUri().toString()))	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
 			{
-				s.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("id", id).request().get();
+				s.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("pid", pid).request().get();
+				System.out.println("mando compromiso con id");
 			}	 
 		}
 	}
@@ -167,11 +176,11 @@ public class Servicio {
 	@GET
     @Path("comision")
     @Produces(MediaType.TEXT_PLAIN)
-	public synchronized void comision(@QueryParam("compromiso") int vComision, @QueryParam("id") int id) {
+	public synchronized void comision(@QueryParam("compromiso") int vComision, @QueryParam("pid") int pid) {
 		//Creo que es asi
 		for(Proceso proc : misProcesos) {				//obviamos el proceso que llama a la funcion. asi eliminamod un bucle de cada proceso
-			if(proc.getIdProceso()!= id) {
-	            proc.comision(vComision, id);
+			if(proc.getIdProceso()!= pid) {
+	            proc.comision(vComision, pid);
 			}
         }
 		//mandamos a los otros servers
@@ -179,7 +188,7 @@ public class Servicio {
 		{
 			if(!s.getUri().toString().equals(miServicio.getUri().toString()))	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
 			{
-				s.path("comision").queryParam("compromiso", vComision).queryParam("id", id).request().get();
+				s.path("comision").queryParam("compromiso", vComision).queryParam("pid", pid).request().get();
 			}
 		}
 	}
@@ -188,7 +197,7 @@ public class Servicio {
 	@GET
     @Path("confirmarcion")
     @Produces(MediaType.TEXT_PLAIN)
-	public synchronized int confirmacion(@QueryParam("comision") int comision, @QueryParam("id") int id) {
+	public synchronized int confirmacion(@QueryParam("comision") int comision, @QueryParam("pid") int pid) {
 		//Creo que es asi
 		//Hay dos opciones
 		//Se lo envia todo uno, buscan la url del server central y le envia la info
@@ -244,15 +253,18 @@ public class Servicio {
                 sEstado=sEstado+";"+aux;
             }
 		}
+		System.out.println();
+		System.out.println(sEstado);
+		System.out.println();
 		return sEstado;
     }
 
 	@GET
     @Path("fallo")
-	public synchronized void fallo(int id) {
+	public synchronized void fallo(@QueryParam("pid") int pid) {
 		for (Proceso proc : misProcesos)
 		{
-			if (proc.getIdProceso()==id)
+			if (proc.getIdProceso()==pid)
 			{
 				if(proc.getError())
 				{
