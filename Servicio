@@ -35,7 +35,7 @@ public class Servicio {
 	private int numProcesos;
 	private int numServidores;
 	private String cadenaProcesos;
-	private ArrayList <Integer> misProcesos = new ArrayList <>();	
+	//private ArrayList <Integer> misProcesos = new ArrayList <>();	
 
 	String url="http://localhost:8080/procesos/rest/Cliente";
 	URI uriCliente;
@@ -44,6 +44,7 @@ public class Servicio {
 	WebTarget Servicios[];
 	ArrayList<Client> clientes = new ArrayList<Client>();
 	String[] urls = new String[2];
+	String RUTA = System.getProperty("user.home");
 
 	public Servicio() throws IOException {					//al iniciar servicio primero mandaremos la ip al cliente
 		int i;												//el cliente como: mmm interesante
@@ -59,7 +60,12 @@ public class Servicio {
 		try{
 			BufferedReader br = new BufferedReader(new FileReader("configuracion.txt"));
 		
-			//damos valor a las variables propias de servicio
+			/*damos valor a las variables propias de servicio
+			 *	1.linea numero de servidores
+			 * 	2.linea numero total procesos
+			 * 	3.linea ip cliente
+			 * 	4.cadena concatenada de procesos	"1,4,7;2,5,8;3,6,9"
+			 */
 			this.numServidores = Integer.parseInt(br.readLine());
 			this.totalProcesos = Integer.parseInt(br.readLine());
 			this.ipCliente = br.readLine();
@@ -79,10 +85,10 @@ public class Servicio {
         
 		//una vez todos han mandado la ip
 		try{
-			br = new BufferedReader(new FileReader("config_servers.txt"));
+			BufferedReader br = new BufferedReader(new FileReader(RUTA+"/config_servers.txt"));
+			String linea;
 			while ((linea = br.readLine()) != null) {	
-				aux = br.readLine();
-				partes = aux.split(",");
+				partes = linea.split(",");
 				String ipServer=partes[0];
 				if(ip.equals(ipServer)) {																			//es él mismo 
 					this.id=Integer.parseInt(partes[1]);
@@ -108,12 +114,12 @@ public class Servicio {
 		/* esta cambiado, ahora cadena procesos tiene "1,5;2,6;3;4" siendo 1,5 lo que tenemos que pillar */
         partes1 = cadenaProcesos.split(";");
         this.numProcesos= partes1.length;
-		partes2 = partes1[id-1].split(";");				//es id-1 porq los servers empiezan desde 1
+		partes2 = partes1[id].split(";");				//es id-1 porq los servers empiezan desde 1
 		//numProcesos=Integer.parseInt(partes1[id-1]);
 		
         //creamos nuestros procesos
 		for (i=0; i<numProcesos; i++) {
-			misProcesos.add(new Proceso(partes2[i], false, uriServer, totalProcesos)); 												//se lo enviamos a los procesos
+			misProcesos.add(new Proceso(Integer.parseInt(partes2[i]), false, uriServer, totalProcesos)); 												//se lo enviamos a los procesos
 		}
 		/*
 		for (int i; i<2; i++) {
@@ -221,11 +227,16 @@ public class Servicio {
     @Path("estado")
     @Produces(MediaType.TEXT_PLAIN)
 	public synchronized String estado() {
+		/*	por cada proceso que nos envía una string del tipo "2/1/1,1,8/false"
+		 * 	los separamos por ";"
+		 * 		EJEMPLO:
+		 * 			3 procesos
+		 * 			s= "0/1/1,1,8/false;1/8/8,1,1/true;2/1/1,8,1/false"
+		 */
 		String sEstado=null;
 		String aux;
 		for (Proceso proc : misProcesos)
 		{
-			String sEstado=
 			aux=proc.estado();
 			if(sEstado == null) {
                 sEstado= aux;
@@ -238,16 +249,16 @@ public class Servicio {
 
 	@GET
     @Path("fallo")
-	public synchronized void actualizacion(int id) {
+	public synchronized void fallo(int id) {
 		for (Proceso proc : misProcesos)
 		{
-			if (proc.id==id)
+			if (proc.getIdProceso()==id)
 			{
-				if(proc.error)
+				if(proc.getError())
 				{
-					proc.error=false;
+					proc.setError(false);
 				} else {
-					proc.error=true
+					proc.setError(true);
 				}
 			}
 		}

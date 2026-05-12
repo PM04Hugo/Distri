@@ -28,6 +28,7 @@ public class Cliente {
     WebTarget servicios[] = new WebTarget[3];
     
     int servers, procesos, cont=0;
+    String RUTA = System.getProperty("user.home");
     
     private ArrayList<String> listaEstados = new ArrayList<>();
     private final ArrayList<String> cola = new ArrayList<>();
@@ -127,18 +128,23 @@ public class Cliente {
     public void procesarComando(String comando) {
         if (comando.startsWith("s") && comando.length() < 2) {
             String res1;
-            String partes,partes0;
-            for(int i=0;i<procesos; i++)
+            String partes[],partes0[];
+            for(int i=0;i<servers; i++)
             {
-                res1 = servicios[i].path("estado").request(MediaType.TEXT_PLAIN).get(String.class);
+                /*	obtenemos de cada servicio: "0/1/1,1,8/false;1/8/8,1,1/true;2/1/1,8,1/false"
+                 *	vamos a separar de cada servicio, los procesos que maneja por ";"
+                 * 	a continuación los añadiremos a lista de estados
+                 * 	finalmente se ordenan
+                 */
+            	res1 = servicios[i].path("estado").request(MediaType.TEXT_PLAIN).get(String.class);
+                partes0 = res1.split(";");
+                for(int j=0;j<partes0.length;j++)
+                {
+                    listaEstados.add(partes0[j]);
+                } 
             }
-            partes0 = res1.split(";");
-            for(int i=0;i<partes0.length;i++)
-            {
-                listaEstados.add(partes0[i]);
-            }   
-
-            Collections.sort(listaEstados, (a, b) -> {          //ordenamos por el id
+            /*ordenamos por el id*/
+            Collections.sort(listaEstados, (a, b) -> {          
                 int aux1 = Integer.parseInt(
                     a.substring(0, a.indexOf('.'))
                 );
@@ -151,10 +157,14 @@ public class Cliente {
             System.out.printf("             PBFT                ");
             System.out.printf("---------------------------------");
             System.out.println(" id\t| var\t| compromisos\t| error\t |");
+            /*	AQUI vamos a pillar por separado cada string ordenada de la  listaEstados
+             * 	"0/1/1,1,8/false"
+             * 	separamos toda la info
+             * */
             for (String s: listaEstados)
             {
-                partes = aux.split("/");
-                System.out.println(" %d\t| %s\t| %s\t| %s\t |", Integer.parseInt(partes[0]), partes[1], partes[2], partes[3]);
+                partes = s.split("/");
+                System.out.printf(" %d\t| %s\t| %s\t| %s\t \n", Integer.parseInt(partes[0]), partes[1], partes[2], partes[3]);
             }
             System.out.println("---------------------------------");
             
@@ -169,7 +179,6 @@ public class Cliente {
             String numero = comando.substring(1);
             int valor = Integer.parseInt(numero);
             String res1 = target.path("fallo").queryParam("id", valor).request(MediaType.TEXT_PLAIN).get(String.class);
-            System.out.println(res1);
         }
     }
     public void crearConfiguración() throws IOException{
@@ -185,8 +194,9 @@ public class Cliente {
 	        System.out.print("Número de procesos: ");
             while (!sc.hasNextInt()) {
                 System.out.println("Introduce un número válido:");
-            } 
+            }
 	        numProcesos = sc.nextInt();
+	        sc.nextLine();
 	        procesos=numProcesos;
 	        servers=numServers;
 
@@ -208,7 +218,7 @@ public class Cliente {
                 listaProcesos[i%servers] += "," + i;
             }
         }
-        for(int i = 0; i < procesos; i++)
+        for(int i = 0; i < servers; i++)
         {
             if(cadenaProcesos == null) {
                 cadenaProcesos = listaProcesos[i];
@@ -217,7 +227,7 @@ public class Cliente {
             }
         }
 	        
-        File f = new File("configuracion.txt");
+        File f = new File(RUTA+"/configuracion.txt");
         if (f.createNewFile()) {
         	
             System.out.println("Archivo creado: " + f.getName()+ "en " + f.getAbsolutePath());
@@ -225,18 +235,16 @@ public class Cliente {
             System.out.println("El archivo ya existe en "+ f.getAbsolutePath());
         }
         try{
-            BufferedWriter bw = new BufferedWriter(new FileWriter(f.getName()));
+            BufferedWriter bw = new BufferedWriter(new FileWriter(RUTA+"/configuracion.txt"));
             bw.write(numServers+"\n");
             bw.write(numProcesos+"\n");
             String ip = InetAddress.getLocalHost().getHostAddress();;
             System.out.println("IP Local: " + ip);
             bw.write(ip+"\n");
             bw.write(cadenaProcesos);
-            bw.write(listaProcesos[servers-1]);
+            //bw.write(listaProcesos[servers]);
             bw.close();
             
-            this.servers=Integer.parseInt(numServers);
-            this.procesos=Integer.parseInt(numProcesos);    
         
         } catch (Exception e) {
                 e.printStackTrace();
@@ -250,13 +258,16 @@ public class Cliente {
     	BufferedWriter bw=null;
     	File f=null;
     	synchronized(lock){
-            cont++;
-            f = new File("config_servers.txt");
+            f = new File(RUTA+"/config_servers.txt");
             //intentamos escribir la ip
             try{
-                bw = new BufferedWriter(new FileWriter(f.getName(),true));
+                bw = new BufferedWriter(new FileWriter(RUTA+"/config_servers.txt",true));
                 bw.write(ip + ","+cont+"\n");
+                URI uriServicio = UriBuilder.fromUri("http://"+ip+":8080/procesos/rest/Servicio").build();
+                servicios[cont] = clienteRest.target(uriServicio);
+                cont++;
                 if (cont < this.servers) {
+                    
                     lock.wait(); 
                 } else{
                     lock.notifyAll();

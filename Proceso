@@ -33,10 +33,22 @@ public class Proceso extends Thread {
         this.Server = clienteRest.target(uri);
     }
 	
+	
+	/*	los getter y setter	*/
 	public int getIdProceso() 
 	{
 		return this.id;				
 	}
+	public boolean getError() 
+	{
+		return this.error;				
+	}
+	public void setError(boolean error) 
+	{
+		this.error=error;				
+	}
+	
+	
 	
 	
 	public void propuesta (int variable) {
@@ -149,20 +161,29 @@ public class Proceso extends Thread {
 		
 	}
 	
-	/*public void comision(int consenso) {
-		//Una vez hemos decidido que "consenso" es nuestro número se lo decimos al resto y actualizamos nuestro valor
-		//Y ellos a nosotros
-		int actualizado = 2;
-		confirmacion(actualizado);
-	}*/
+	/*
+		public void comision(int consenso) {
+			//Una vez hemos decidido que "consenso" es nuestro número se lo decimos al resto y actualizamos nuestro valor
+			//Y ellos a nosotros
+			int actualizado = 2;
+			confirmacion(actualizado);
+		}
+	*/
 	
 	public void confirmacion(int actualizado) {
 		
 	}
 	public String estado() {
+		/*	para mandar el estado mandaremos una string de la siguiente forma
+		 * 		id						"2"
+		 * 		valor					"1"
+		 * 		lista de compromisos 	"1,1,1,8"
+		 * 		error 					"false"
+		 * 	TODAS SEPARADAS POR "/" EN ESTE EJEMPLO QUEDARÍA ALGO ASÍ "2/1/1,1,1,8/false" 
+		 * */
 		String aux, sError;
 		String sCompromisos=null;
-		for(int i =0; i<num_procesos;i++)
+		for(int i =0; i<numProcesos;i++)
 		{
 			aux=compromisos[i]+"";
 			if(sCompromisos == null) {
@@ -173,7 +194,7 @@ public class Proceso extends Thread {
 		}
 		if (error)				//si error es true
 		{
-			sError="true"
+			sError="true";
 		}
 		sError = "false";
 		return (id+"/"+valor+"/"+sCompromisos+"/"+sError);
