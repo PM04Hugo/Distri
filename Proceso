@@ -12,7 +12,7 @@ import javax.ws.rs.core.*;
 @Path("Proceso")
 public class Proceso extends Thread {
 	
-	private int id, valor, vCompromiso, vComision, vConfirmacion;
+	private int pid, valor, vCompromiso, vComision, vConfirmacion;
 	private int procesosCompromiso=0, procesosComision=0;
 	private int numProcesos;
 	private boolean error;
@@ -22,8 +22,8 @@ public class Proceso extends Thread {
 	int compromisos[]; 
 	int comisiones[];
 	
-	public Proceso(int id, boolean error, String url, int numProcesos) {
-        this.id = id;
+	public Proceso(int pid, boolean error, String url, int numProcesos) {
+        this.pid = pid;
         this.error=error;
 		this.numProcesos = numProcesos;
 		this.compromisos = new int[numProcesos];   
@@ -37,7 +37,7 @@ public class Proceso extends Thread {
 	/*	los getter y setter	*/
 	public int getIdProceso() 
 	{
-		return this.id;				
+		return this.pid;				
 	}
 	public boolean getError() 
 	{
@@ -72,23 +72,23 @@ public class Proceso extends Thread {
 			do {
 				random = (int)(Math.random() * 201);
 			}while(random==variable || random==0);
-			compromisos[id]=random;
+			compromisos[pid]=random;
 			vCompromiso=random;
 		}
 		else {
 			//Si no lo hay les manda el que nos llego
-			compromisos[id]=variable;
+			compromisos[pid]=variable;
 			procesosCompromiso++;
 			vCompromiso=variable;
 		}
 		this.valor=vCompromiso;
-		Server.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("id", this.id).request().get();
+		Server.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("pid", this.pid).request().get();
 				
     }
 	
-	public void compromiso(int propuesta, int id) {
+	public void compromiso(int propuesta, int pid) {
 		int quorum=0;
-		compromisos[id]=propuesta;
+		compromisos[pid]=propuesta;
 		procesosCompromiso++;
 		if(procesosCompromiso>numProcesos/2)
 		{
@@ -107,14 +107,14 @@ public class Proceso extends Thread {
 					//Llamada al srver
 					this.vComision=compromisos[i];
 					procesosComision++;
-					comisiones[this.id]=vComision;
-					Server.path("comision").queryParam("compromiso", vComision).queryParam("id", this.id).request().get();
+					comisiones[this.pid]=vComision;
+					Server.path("comision").queryParam("compromiso", vComision).queryParam("pid", this.pid).request().get();
 					return;		
 				}
 			}
 			if(procesosComision==(numProcesos-1))
 		    {
-		    	Server.path("comision").queryParam("compromiso", -1).queryParam("id", this.id).request().get();
+		    	Server.path("comision").queryParam("compromiso", -1).queryParam("pid", this.pid).request().get();
 		    }
 		}
 	}
@@ -124,12 +124,12 @@ public class Proceso extends Thread {
 						//Manda mensaje al server para pasar a la siguiente fase
 					//NO
 					
-	public void comision(int compromiso , int id) {
+	public void comision(int compromiso , int pid) {
 		//Les envia al resto el número que el tiene
 		//Y ellos nos lo envián a nosotros
 		//Vemos que número tiene mayoría y lo pasamos a comisiones
 
-	    comisiones[id] = compromiso;
+	    comisiones[pid] = compromiso;
 	    int quorum = 0;
 	    procesosComision++;
 	    if(procesosComision>numProcesos/2)
@@ -147,13 +147,13 @@ public class Proceso extends Thread {
 	
 		        if(quorum >= numProcesos/2) {
 					this.vConfirmacion=comisiones[i];
-		        	Server.path("confirmacion").queryParam("comision", vConfirmacion).queryParam("id", this.id).request().get(); 
+		        	Server.path("confirmacion").queryParam("comision", vConfirmacion).queryParam("pid", this.pid).request().get(); 
 		            return;
 		        }
 		    }
 		    if(procesosComision==(numProcesos-1))
 		    {
-		    	Server.path("confirmacion").queryParam("comision", -1).queryParam("id", this.id).request().get();
+		    	Server.path("confirmacion").queryParam("comision", -1).queryParam("pid", this.pid).request().get();
 		    }
 	    }
 		
@@ -197,7 +197,7 @@ public class Proceso extends Thread {
 			sError="true";
 		}
 		sError = "false";
-		return (id+"/"+valor+"/"+sCompromisos+"/"+sError);
+		return (pid+"/"+valor+"/"+sCompromisos+"/"+sError);
 
 	}
 
