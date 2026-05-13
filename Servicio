@@ -142,9 +142,9 @@ public class Servicio {
 		//mandamos a los otros servers
 		for (WebTarget s : Servicios)
 		{
-			if(!propagado)	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
+			if(propagado)	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
 			{
-				s.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("pid", pid).request().async().get();
+				s.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("pid", pid).queryParam("propagado", false).request().async().get();
 				System.out.println("mando compromiso con id"+pid);
 			}	 
 		}
@@ -163,7 +163,7 @@ public class Servicio {
 		//mandamos a los otros servers
 		for (WebTarget s : Servicios)
 		{
-			if(!s.getUri().toString().equals(miServicio.getUri().toString()))	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
+			if(!propagado)	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
 			{
 				s.path("comision").queryParam("compromiso", vComision).queryParam("pid", pid).queryParam("propagado", true).request().async().get();
 			}
@@ -189,7 +189,15 @@ public class Servicio {
 		
 		  Hacemos como los procesos le hacian a los servicios, le envian al cliente lo que tienen, y el cliente mira si hay quorum cada vez
 		 */
-		
+		for (WebTarget s : Servicios) {
+	        if(!propagado) {
+	            s.path("confirmacion")
+	                .queryParam("comision", comision)
+	                .queryParam("pid", pid)
+	                .queryParam("propagado", true)
+	                .request().async().get();
+	        }
+	    }
 		synchronized(candadoConsenso) {
 	        // Guardamos el valor que nos acaba de llegar por el túnel REST
 	        valoresRecibidos.add(comision);
