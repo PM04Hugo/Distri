@@ -1,178 +1,343 @@
-
 package services;
 
-import javax.inject.Singleton;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.client.*;
 import javax.ws.rs.core.*;
 import java.net.URI;
+
 import java.util.ArrayList;
-import java.nio.file.*;
-import java.util.List;
 import java.util.Scanner;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
 
+import java.net.InetAddress;
+import java.util.Collections;
 
-
-//LA INTERFAZZZZZZZZZZZZZZZZZ
-@Path("Cliente")
+//@Path("Cliente")
 public class Cliente {
-	
-	//Le da la info a los 3 servidores sobre, con quien hablan (procesos), quienes son (servidores)
-	
-	private int i;
-	private boolean cola;
-	private Client clienteRest = ClientBuilder.newClient(); //Creamos el cliente, cada atleta será uno
-    URI uri=UriBuilder.fromUri("http://localhost:8080/procesos/rest/Servicio").build();
-    WebTarget target = clienteRest.target(uri);// se tiene que atar a la web
-    WebTarget servicios[]= new WebTarget[3];
+
+    private Client clienteRest = ClientBuilder.newClient();
+    URI uri = UriBuilder.fromUri("http://localhost:8080/procesos/rest/Servicio").build();
+    WebTarget target = clienteRest.target(uri);
+    WebTarget servicios[] = new WebTarget[3];
     
-	
-	//Varios server
-	//ArrayList<Client> clientes = new ArrayList<Client>();
-	//List<String> todas = Files.readAllLines(Paths.get("config.txt"));
-    //String[] url = new String[3];
-	//ArrayList<String> urls= new ArrayList<String>();
-	/*for (i=0 ; i< 3 ;i++ ) {
-		//.txt
-		url[i] = todas.get(i);
-		clientes.add( ClientBuilder.newClient());
-		URI uri=UriBuilder.fromUri(url[i]).build(); //urlServer1, urlServer2, urlServer2
-		servicios[i]=clienteRest.target(uri);
-		
-	}
-	Y luego se lo mandariamos al cada uno, en el .txt este sería el formato
-	
-	1;http://localhost:8080/procesos/rest/Servicio
-	2;http://localhost:8080/procesos/rest/Servicio
-	3;http://localhost:8080/procesos/rest/Servicio
-	
-	Las url para las comunicaciones y usando el como separador el ";" para indicar que procesos se encarga num=x, Servidorx se encarga de x y x+1
-	*/
+    int servers=1, procesos, cont=1;
+    String RUTA = System.getProperty("user.home");
+    
+    private ArrayList<String> listaEstados = new ArrayList<>();
+    private final ArrayList<String> cola = new ArrayList<>();
+    private Object lock = new Object();
+    Scanner sc = new Scanner(System.in);
     
     public static void main(String[] args) {
+    	Scanner sc = new Scanner(System.in);
         try {
             Cliente c = new Cliente();
-            c.iniciar(); // Esto activa el Scanner y el bucle del teclado
+            c.iniciar();
         } catch (Exception e) {
             e.printStackTrace();
         }
+        sc.close();
     }
-    
-    public void iniciar() {
-        // Aquí lanzas el bucle del teclado
-        menuInteractivo();
+
+    public void iniciar() throws IOException {
+    	//antes que nada hacemos una comprobacion
+    	//crearConfiguración();
+    	
+        Thread hiloTeclado = new Thread(() -> {
+            menuInteractivo();
+        });
+
+        Thread hiloProcesador = new Thread(() -> {
+            while (true) {
+                String comando = null;
+                synchronized (cola) {
+                    while (cola.isEmpty()) {
+                        try {
+                            cola.wait(); // espera hasta que haya algo
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                    }
+                    comando = cola.remove(0);
+                }
+
+                if (comando.equals("exit")) {
+                    System.out.println("Procesador cerrado.");
+                    break;
+                }
+                procesarComando(comando);
+            }
+        });
+
+        hiloTeclado.start();
+        hiloProcesador.start();
+
+        try {
+            hiloTeclado.join();
+            hiloProcesador.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("Cliente finalizado.");
     }
-    
-    
+
     public void menuInteractivo() {
-        Scanner sc = new Scanner(System.in);
         String comando;
+        System.out.println("");
+        System.out.println("");
         while (true) {
             System.out.print("> ");
             comando = sc.nextLine();
-            if (comando.startsWith("s") && comando.length()<2) {
-            	String res1 = target.path("info").request(MediaType.TEXT_PLAIN).get(String.class);
-            	System.out.println(res1);
+            if (comando.startsWith("s") && comando.length() < 2) {
+                synchronized (cola) {
+                    cola.add(comando);
+                    cola.notify();
+                }
             } else if (comando.startsWith("h")) {
-            	System.out.println("Comandos disponibles: sX (propuesta), fN (fallos), s (estado), exit");
+                System.out.println("Comandos disponibles: sX (propuesta), fN (fallos), s (estado), exit");
             } else if (comando.startsWith("s")) {
-            	//Enviar propuesta
-            	String numero = comando.substring(1);
-                int valor = Integer.parseInt(numero);
-                String res1 = target.path("inicio").request(MediaType.TEXT_PLAIN).get(String.class); //Pasar pquarams para que cada uno sepa
-                /*
-                  Dos opciones
-                 */
-                /*
-                  En ambos casos le pasamos el .txt a todos, para que saquen su info, junto con su número, para que se reconozcan
-                  
-                  Si solo hay uno que se compare con la URL del cliente y envie el resto
-                 */
+                synchronized (cola) {
+                    cola.add(comando);
+                    cola.notify();
+                }
+            } else if (comando.startsWith("f")) {
+                synchronized (cola) {
+                    cola.add(comando);
+                    cola.notify();
+                }
+            } else if (comando.equals("exit")) {
+                synchronized (cola) {
+                    cola.add("exit");
+                    cola.notify();
+                }
+                break;
+            } else {
+                System.out.println("Comando desconocido");
+            }
+        }
+    }
+
+    public void procesarComando(String comando) {
+        if (comando.equals("s")) {
+        	File f = new File(RUTA+"/a.txt");
+            //intentamos escribir la ip
+            try{
+            	BufferedWriter bw = new BufferedWriter(new FileWriter(RUTA+"/a.txt",true));
                 
-            	
-            } else if (comando.startsWith("f"))
-            {
-            	String numero = comando.substring(1);
-            	int valor = Integer.parseInt(numero);
-            	String res1 = target.path("cambio").request(MediaType.TEXT_PLAIN).get(String.class);
-            }else
-            {
-            	break;
+            	listaEstados.clear();
+	            String res1;
+	            String partes[],partes0[];
+	            
+	            for(int i=0;i<servers; i++)
+	            {
+	                /*	obtenemos de cada servicio: "0/1/1,1,8/false;1/8/8,1,1/true;2/1/1,8,1/false"
+	                 *	vamos a separar de cada servicio, los procesos que maneja por ";"
+	                 * 	a continuación los añadiremos a lista de estados
+	                 * 	finalmente se ordenan
+	                 */
+	            	res1 = target.path("estado").request(MediaType.TEXT_PLAIN).get(String.class);
+	                partes0 = res1.split(";");
+	                for(int j=0;j<partes0.length;j++)
+	                {
+	                    listaEstados.add(partes0[j]);
+	                } 
+	            }
+	            /*ordenamos por el id*/
+	            Collections.sort(listaEstados, (a, b) -> {          
+	                int aux1 = Integer.parseInt(
+	                    a.substring(0, a.indexOf('/'))
+	                );
+	                int aux2 = Integer.parseInt(
+	                    b.substring(0, b.indexOf('/'))
+	                );
+	                return Integer.compare(aux1, aux2);
+	            });
+	            System.out.printf("---------------------------------");
+	            System.out.printf("             PBFT                ");
+	            System.out.printf("---------------------------------");
+	            System.out.println(" id\t| var\t| compromisos\t| error\t |");
+	            /*	AQUI vamos a pillar por separado cada string ordenada de la  listaEstados
+	             * 	"0/1/1,1,8/false"
+	             * 	separamos toda la info
+	             * */
+	            for (String s: listaEstados)
+	            {
+	            	bw.write(s);
+	            	
+	            	partes = s.split("/");
+	                System.out.printf(" %d\t| %s\t| %s\t| %s\t \n", Integer.parseInt(partes[0]), partes[1], partes[2], partes[3]);
+	            }
+	            System.out.println("---------------------------------");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }	
+
+        } else if (comando.startsWith("s")) {
+        	String numero = comando.substring(1);
+            int valor = Integer.parseInt(numero);
+
+            try {
+                System.out.println("[HiloProcesador] Enviando propuesta al servidor y esperando procesos...");
+                //Generar varios hilos para cada servicio, asi no hay espera ocupada 
+                String res1 = target.path("inicio")
+                                    .queryParam("propuesta", valor)
+                                    .request(MediaType.TEXT_PLAIN)
+                                    .get(String.class);
+
+                String[] partes = res1.replace("[", "").replace("]", "").replace(" ", "").split(",");
+                int[] valores = new int[partes.length];
+                for(int i = 0; i < partes.length; i++) {
+                    valores[i] = Integer.parseInt(partes[i]);
+                }
+                if(valores[0]==-1)
+                {
+                	System.out.println("No ha habido consenso");
+                }
+                else {
+                	int escogido=0;
+	                for(int i=0; i<valores.length; i++)
+	                {
+	                	int quorum=0;
+	                	for(int j=0; j<valores.length; j++)
+	                	{
+	                		if(valores[i]==valores[j]) {
+	                			quorum++;
+	                		}
+	                		if(quorum>(valores.length)/2)
+	                		{
+	                			escogido= valores[i];
+	                			break;
+	                		}
+	                	}
+	                }
+	                if(escogido==0)
+	                {
+	                	System.out.println("No ha habido consenso, me da a mi q es imposible a estas alturas");
+	                }
+	                else
+	                {
+	                	System.out.println("El valor cambiado es: "+escogido);
+	                }
+	                
+                }
+
+            } catch (Exception e) {
+                System.err.println("Error al recibir el return del servidor: " + e.getMessage());
+            }
+
+        } else if (comando.startsWith("f")) {
+            String numero = comando.substring(1);
+            int valor = Integer.parseInt(numero);
+            String res1 = target.path("fallo").queryParam("pid", valor).request(MediaType.TEXT_PLAIN).get(String.class);
+        }
+    }
+    /*public void crearConfiguración() throws IOException{
+        int numServers, numProcesos; 
+        new File(RUTA + "/config_servers.txt").delete();
+
+        System.out.println("Bienvenido, estimado cliente al servicio PBFT");
+	        System.out.println("Antes de comenzar por favor indique los siguientes datos");
+	        System.out.print("Número de servidores: ");
+	        while (!sc.hasNextInt()) {
+                System.out.println("Introduce un número válido:");
+            } 
+            numServers = sc.nextInt();
+	        System.out.print("Número de procesos: ");
+            while (!sc.hasNextInt()) {
+                System.out.println("Introduce un número válido:");
+            }
+	        numProcesos = sc.nextInt();
+	        sc.nextLine();
+	        procesos=numProcesos;
+	        servers=numServers;
+
+            /*
+            *   aqui basicamente estamos repartiendo todos los ids de manera equitativa con el %
+            *   los ponemos en un array de strings [ej] : [1,4,7] [2,5,8] [3,6,9] para 3 servidores 9 procesos
+            *   a continuacion creamos la super duper string que separa:
+            *       "," los procesos de un mismo servidor 
+            *       ";" los procesos de cada servidor
+            *       [ej] : 1,4,7;2,5,8;3,6,9
+            *
+            *
+            *
+
+	    String[] listaProcesos = new String[servers];
+        String cadenaProcesos=null;
+        for(int i = 0; i < procesos; i++) {
+            if(listaProcesos[i%servers] == null) {
+                listaProcesos[i%servers] = "" + i;
+            } else {
+                listaProcesos[i%servers] += "," + i;
+            }
+        }
+        for(int i = 0; i < servers; i++)
+        {
+            if(cadenaProcesos == null) {
+                cadenaProcesos = listaProcesos[i];
+            } else {
+                cadenaProcesos += ";" + listaProcesos[i];
+            }
+        }
+	        
+        File f = new File(RUTA+"/configuracion.txt");
+        if (f.createNewFile()) {
+        	
+            System.out.println("Archivo creado: " + f.getName()+ "en " + f.getAbsolutePath());
+        } else {
+            System.out.println("El archivo ya existe en "+ f.getAbsolutePath());
+        }
+        try{
+            BufferedWriter bw = new BufferedWriter(new FileWriter(RUTA+"/configuracion.txt"));
+            bw.write(numServers+"\n");
+            bw.write(numProcesos+"\n");
+            String ip = InetAddress.getLocalHost().getHostAddress();;
+            System.out.println("IP Local: " + ip);
+            bw.write(ip+"\n");
+            bw.write(cadenaProcesos);
+            //bw.write(listaProcesos[servers]);
+            bw.close();
+            
+        
+        } catch (Exception e) {
+                e.printStackTrace();
+        }
+        //sincronizar con servicio()
+    }*/
+    
+   /* @GET
+    @Path("uris")
+    public void crearUris(@QueryParam("ipServer") String ip) throws IOException, InterruptedException{
+    	synchronized(lock){
+            File f = new File(RUTA+"/config_servers.txt");
+            //intentamos escribir la ip
+            try{
+            	BufferedWriter bw = new BufferedWriter(new FileWriter(RUTA+"/config_servers.txt",true));
+                bw.write(ip + ","+cont+"\n");
+                URI uriServicio = UriBuilder.fromUri("http://"+ip+":8080/procesos/rest/Servicio").build();
+                servicios[cont] = clienteRest.target(uriServicio);
+                cont++;
+                if (cont < this.servers) {
+                    
+                    lock.wait(); 
+                } else{
+                    lock.notifyAll();
+                }
+                bw.close();    
+            } catch (Exception e) {
+                e.printStackTrace();
             }
             
-            // ... añadir más comandos fN, etc.
         }
-        sc.close();
-    }
-    
-    @GET
-    @Path("final")
-    @Produces(MediaType.TEXT_PLAIN)
-    public synchronized void fin(@QueryParam("array") int propuesta[],@QueryParam("numProc") int numProc/*@QueryParam("id") int id */) {
-    		//Hay dos  formas
     	
-    		//Se lo envia un solo proceso\\ El array ya esta montado, en ese caso, mira por quorum
-    		/*
-    		 for (int i=0, i<numProc; i++){
-    		 	comprobar=compromisos[i];
-				quorum=0;
-				if (comprobar==0)
-					continue;
-				for(int j=0;j<numProcesos;j++) {
-					if(compromisos[j]==0)
-							continue;
-						else if (compromisos[j]==comprobar) 
-							quorum++;
-				}
-				if(quorum>=4) {
-					//Llamada al srver
-					System.out.printf("ACABOSE, el quorum es: %d" comprobar );	
-				}
-    		 }
-    		 */
-    	
-    		//O no hay server centralizado, por lo cual funciona igual que los métodos quorum de los procesos
-    	
-    		/*
-    		 	int quorum=0;
-				int comprobar=0;
-				if(compromisos[id]==0)
-					compromisos[id]=propuesta;
-				
-				for(int i=0;i<numProcesos;i++)
-				{
-					comprobar=compromisos[i];
-					quorum=0;
-					if (comprobar==0)
-						continue;
-					for(int j=0;j<numProcesos;j++) {
-						if(compromisos[j]==0)
-							continue;
-						else if (compromisos[j]==comprobar) 
-							quorum++;
-					}
-					if(quorum>=4) {
-						//Llamada al srver
-						System.out.printf("ACABOSE, el quorum es: %d" comprobar );
-					}
-				}
-    		 */
-    		
-    	}
-
-
+    }*/
 }
-
-
-
-
-//QUIERO HACER ESTO--> Server 1: Entendido --> Servers 2, 3: Entendido--> Se ponen
-
-
-
-//QUIERO HACER ESTO--> Server 1,2,3: OKEI--> Cliente de vuelta
-//Como sincronizamos
