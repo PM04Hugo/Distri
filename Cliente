@@ -193,10 +193,13 @@ public class Cliente {
             try {
                 System.out.println("[HiloProcesador] Enviando propuesta al servidor y esperando procesos...");
                 //Generar varios hilos para cada servicio, asi no hay espera ocupada 
-                String res1 = target.path("inicio")
-                                    .queryParam("propuesta", valor)
-                                    .request(MediaType.TEXT_PLAIN)
-                                    .get(String.class);
+                List <String> resultados = new ArrayList<>();
+                String res1=null;
+                for (WebTarget s : servicios) {
+                    res1 = s.path("inicio").queryParam("propuesta", valor).request(MediaType.TEXT_PLAIN).get(String.class);
+                    resultados.add(res1);
+                }
+
 
                 String[] partes = res1.replace("[", "").replace("]", "").replace(" ", "").split(",");
                 int[] valores = new int[partes.length];
