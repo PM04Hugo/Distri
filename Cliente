@@ -257,15 +257,8 @@ public class Cliente {
         procesos = sc.nextInt();
         sc.nextLine();
 
-        //String ip = InetAddress.getLocalHost().getHostAddress();
-        String ip = null;
-        try {
-            Socket socket = new Socket("8.8.8.8", 80);
-            ip = socket.getLocalAddress().getHostAddress();
-            socket.close();
-        } catch (Exception e) {
-            ip = InetAddress.getLocalHost().getHostAddress(); // fallback
-        }
+        String ip = InetAddress.getLocalHost().getHostAddress();
+        
         System.out.println("IP Local: " + ip);
         
          /*	
