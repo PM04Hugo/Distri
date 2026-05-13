@@ -6,9 +6,10 @@ import javax.ws.rs.*;
 import javax.ws.rs.Path;
 import javax.ws.rs.client.*;
 import javax.ws.rs.core.*;
+import java.util.List;
 
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
@@ -36,21 +37,18 @@ public class Servicio {
 	private int numProcesos;
 	private int numServidores;
 	private String cadenaProcesos;
-	//private ArrayList <Integer> misProcesos = new ArrayList <>();	
 
 	String url="http://localhost:8080/procesos/rest/Cliente";
 	URI uriCliente;
-    //WebTarget Cliente;
     WebTarget miServicio;
-	List <WebTarget> Servicios = new ArrayList<>();
-	
-	//ArrayList<Client> clientes = new ArrayList<Client>();
-	//String[] urls = new String[2];
+    List <WebTarget> Servicios = new ArrayList<>();
 	String RUTA = System.getProperty("user.home");
+	private List<Integer> valoresRecibidos = Collections.synchronizedList(new ArrayList<>());
+	
+	private int procesosFinalizados = 0;
+	private final Object candadoConsenso = new Object();
 
 	public Servicio() throws IOException {					//al iniciar servicio primero mandaremos la ip al cliente
-		int i;												//el cliente como: mmm interesante
-		String aux;
 		try {												
 			this.ip = InetAddress.getLocalHost().getHostAddress();
 			System.out.println("IP server:"+ip);
@@ -58,8 +56,9 @@ public class Servicio {
 		catch(Exception e) {
 			e.printStackTrace();
 		}
+		
     }
-
+	
 	@GET
     @Path("configuracion")
 	public synchronized void configuracion(@QueryParam("ips") String ipServers, @QueryParam("cadenaProcesos") String cadenaProcesos, @QueryParam("totalProcesos") int totalProcesos) {
@@ -93,15 +92,11 @@ public class Servicio {
 	     * 	ej: 6 proceso 4 servidores -> listaProcesos[4]= {2,2,1,1}  -> "2,2,1,1"
 	     * 	con el id (1/2/3/4)- 1 pillamos el que es nuestro                ^
 	     */
-	
 		/* esta cambiado, ahora cadena procesos tiene "1,5;2,6;3;4" siendo 1,5 lo que tenemos que pillar */
-	        //partes1 = cadenaProcesos.split(";");
-	        //this.numProcesos= partes1.length;
-			//partes2 = partes1[id].split(",");				//ya no es id-1 porq los servers empiezan desde 0
+		
 		partes1 = cadenaProcesos.split(";");
 		partes2 = partes1[id].split(",");
 		this.numProcesos = partes2.length;
-		//numProcesos=Integer.parseInt(partes1[id-1]);
 		
 	    //creamos nuestros procesos
 		for (int i=0; i<numProcesos; i++) {
@@ -109,16 +104,28 @@ public class Servicio {
 			misProcesos.add(new Proceso(Integer.parseInt(partes2[i]), false, uriServer, totalProcesos)); 												//se lo enviamos a los procesos
 		}
 	}
+
+
 	@GET
     @Path("inicio")
     @Produces(MediaType.TEXT_PLAIN)							//aqui no se comunican con otros servicios
-	public synchronized String inicio(@QueryParam("propuesta") int propuesta) {
-		String s="s";
-		for(Proceso proc : misProcesos) {
-            proc.propuesta(propuesta);
-            System.out.println(proc.getIdProceso()+" llegue :3 a propuesta desde servicio "+id);
-        }
-		return s;
+	public String inicio(@QueryParam("propuesta") int propuesta) {
+		synchronized (candadoConsenso) {
+	        valoresRecibidos.clear();
+	        procesosFinalizados = 0;
+	    }
+		for (Proceso proc : misProcesos) {
+	        proc.propuesta(propuesta);
+	    }//Para quitar problemas de rondas y tal
+	    for (Proceso proc : misProcesos) {
+	        proc.enviar();
+	    }
+	    synchronized (candadoConsenso) {
+	        try {
+	            candadoConsenso.wait(5000);
+	        } catch (InterruptedException e) { e.printStackTrace(); }
+	    }
+        return valoresRecibidos.toString(); // Enviará algo como "[10, 10]"
     }
 	
 	
@@ -126,7 +133,7 @@ public class Servicio {
 	@GET
 	@Path("compromiso")
 	@Produces(MediaType.TEXT_PLAIN)
-	public synchronized void pquorum(@QueryParam("propuesta") int vCompromiso, @QueryParam("pid") int pid) {
+	public void pquorum(@QueryParam("propuesta") int vCompromiso, @QueryParam("pid") int pid) {
 		//mandamos a nuestros procesos
 		for(Proceso proc : misProcesos) {					//obviamos el proceso que llama a la funcion. asi eliminamod un bucle de cada proceso
 			if(proc.getIdProceso()!= pid) {
@@ -134,20 +141,20 @@ public class Servicio {
 			}
         }
 		//mandamos a los otros servers
-		for (WebTarget s : Servicios)
+		/*for (WebTarget s : Servicios)
 		{
 			if(!s.getUri().toString().equals(miServicio.getUri().toString()))	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
 			{
-				s.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("pid", pid).request().get();
+				s.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("pid", pid).request().async().get();
 				System.out.println("mando compromiso con id");
 			}	 
-		}
+		}*/
 	}
 	
 	@GET
     @Path("comision")
     @Produces(MediaType.TEXT_PLAIN)
-	public synchronized void comision(@QueryParam("compromiso") int vComision, @QueryParam("pid") int pid) {
+	public void comision(@QueryParam("compromiso") int vComision, @QueryParam("pid") int pid) {
 		//Creo que es asi
 		for(Proceso proc : misProcesos) {				//obviamos el proceso que llama a la funcion. asi eliminamod un bucle de cada proceso
 			if(proc.getIdProceso()!= pid) {
@@ -155,20 +162,20 @@ public class Servicio {
 			}
         }
 		//mandamos a los otros servers
-		for (WebTarget s : Servicios)
+		/*for (WebTarget s : Servicios)
 		{
 			if(!s.getUri().toString().equals(miServicio.getUri().toString()))	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
 			{
-				s.path("comision").queryParam("compromiso", vComision).queryParam("pid", pid).request().get();
+				s.path("comision").queryParam("compromiso", vComision).queryParam("pid", pid).request().async().get();
 			}
-		}
+		}*/
 	}
 	
 	
 	@GET
-    @Path("confirmarcion")
+    @Path("confirmacion")
     @Produces(MediaType.TEXT_PLAIN)
-	public synchronized int confirmacion(@QueryParam("comision") int comision, @QueryParam("pid") int pid) {
+	public void confirmacion(@QueryParam("comision") int comision, @QueryParam("pid") int pid) {
 		//Creo que es asi
 		//Hay dos opciones
 		//Se lo envia todo uno, buscan la url del server central y le envia la info
@@ -177,36 +184,30 @@ public class Servicio {
 		/*
 		  for()
 		  	Comprueba que no haya 0 si no los hoy lo madanda, si lo hay es que falta un server por mandar toda su info
-		 */
+		 
 		
 		//Si no hay central
-		/*
+		
 		  Hacemos como los procesos le hacian a los servicios, le envian al cliente lo que tienen, y el cliente mira si hay quorum cada vez
 		 */
 		
-		return comision;
+		synchronized(candadoConsenso) {
+	        // Guardamos el valor que nos acaba de llegar por el túnel REST
+	        valoresRecibidos.add(comision);
+	        procesosFinalizados++;
+
+	        // Si ya han llamado todos los procesos que este servidor gestiona
+	        if (procesosFinalizados == misProcesos.size()) {
+	            candadoConsenso.notify(); // Despertamos al hilo que está esperando para hacer el return
+	        }
+	    }
 	}
 	
-	@GET
-    @Path("info")
-    @Produces(MediaType.TEXT_PLAIN)
-	public synchronized String info() {
-		String s="s";
-		return s;
-    }
-
-	@GET
-    @Path("actualizacion")
-	public synchronized  String actualizacion(int id) {
-		String s="s";
-		
-		return s;
-	}
 
 	@GET
     @Path("estado")
     @Produces(MediaType.TEXT_PLAIN)
-	public synchronized String estado() {
+	public String estado() {
 		/*	por cada proceso que nos envía una string del tipo "2/1/1,1,8/false"
 		 * 	los separamos por ";"
 		 * 		EJEMPLO:
@@ -232,7 +233,7 @@ public class Servicio {
 
 	@GET
     @Path("fallo")
-	public synchronized void fallo(@QueryParam("pid") int pid) {
+	public String fallo(@QueryParam("pid") int pid) {
 		for (Proceso proc : misProcesos)
 		{
 			if (proc.getIdProceso()==pid)
@@ -245,5 +246,6 @@ public class Servicio {
 				}
 			}
 		}
+		return "hecho";
 	}
 }
