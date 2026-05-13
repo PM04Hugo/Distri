@@ -132,7 +132,7 @@ public class Servicio {
 	@GET
 	@Path("compromiso")
 	@Produces(MediaType.TEXT_PLAIN)
-	public void pquorum(@QueryParam("propuesta") int vCompromiso, @QueryParam("pid") int pid) {
+	public void pquorum(@QueryParam("propuesta") int vCompromiso, @QueryParam("pid") int pid, @QueryParam("propagado") boolean propagado) {
 		//mandamos a nuestros procesos
 		for(Proceso proc : misProcesos) {					//obviamos el proceso que llama a la funcion. asi eliminamod un bucle de cada proceso
 			if(proc.getIdProceso()!= pid) {
@@ -140,20 +140,20 @@ public class Servicio {
 			}
         }
 		//mandamos a los otros servers
-		/*for (WebTarget s : Servicios)
+		for (WebTarget s : Servicios)
 		{
-			if(!s.getUri().toString().equals(miServicio.getUri().toString()))	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
+			if(!propagado)	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
 			{
 				s.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("pid", pid).request().async().get();
-				System.out.println("mando compromiso con id");
+				System.out.println("mando compromiso con id"+pid);
 			}	 
-		}*/
+		}
 	}
 	
 	@GET
     @Path("comision")
     @Produces(MediaType.TEXT_PLAIN)
-	public void comision(@QueryParam("compromiso") int vComision, @QueryParam("pid") int pid) {
+	public void comision(@QueryParam("compromiso") int vComision, @QueryParam("pid") int pid, @QueryParam("propagado") boolean propagado) {
 		//Creo que es asi
 		for(Proceso proc : misProcesos) {				//obviamos el proceso que llama a la funcion. asi eliminamod un bucle de cada proceso
 			if(proc.getIdProceso()!= pid) {
@@ -161,20 +161,20 @@ public class Servicio {
 			}
         }
 		//mandamos a los otros servers
-		/*for (WebTarget s : Servicios)
+		for (WebTarget s : Servicios)
 		{
 			if(!s.getUri().toString().equals(miServicio.getUri().toString()))	//es basicamente comprobar si la uri del web target del for es distinta a la uri del servicio
 			{
-				s.path("comision").queryParam("compromiso", vComision).queryParam("pid", pid).request().async().get();
+				s.path("comision").queryParam("compromiso", vComision).queryParam("pid", pid).queryParam("propagado", true).request().async().get();
 			}
-		}*/
+		}
 	}
 	
 	
 	@GET
     @Path("confirmacion")
     @Produces(MediaType.TEXT_PLAIN)
-	public void confirmacion(@QueryParam("comision") int comision, @QueryParam("pid") int pid) {
+	public void confirmacion(@QueryParam("comision") int comision, @QueryParam("pid") int pid, @QueryParam("propagado") boolean propagado) {
 		//Creo que es asi
 		//Hay dos opciones
 		//Se lo envia todo uno, buscan la url del server central y le envia la info

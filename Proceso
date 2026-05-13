@@ -90,7 +90,7 @@ public class Proceso {
     }
 	
 	public synchronized void enviar () {
-		Server.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("pid", this.pid).request().async().get();		
+		Server.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("pid", this.pid).queryParam("propagado", true).request().async().get();		
 	}
 	
 	public synchronized void compromiso(int propuesta, int pid) {
@@ -118,14 +118,14 @@ public class Proceso {
 						comisiones[this.pid]=vComision;
 						compromiso=true;
 						procesosComision++;
-						Server.path("comision").queryParam("compromiso", vComision).queryParam("pid", this.pid).request().async().get();
+						Server.path("comision").queryParam("compromiso", vComision).queryParam("pid", this.pid).queryParam("propagado", false).request().async().get();
 						return;		
 					}
 				}
 				if(procesosCompromiso==numProcesos)
 			    {
 					procesosComision++;
-			    	Server.path("comision").queryParam("compromiso", -1).queryParam("pid", this.pid).request().async().get();
+			    	Server.path("comision").queryParam("compromiso", -1).queryParam("pid", this.pid).queryParam("propagado", false).request().async().get();
 			    }
 			}
 		}
@@ -161,13 +161,13 @@ public class Proceso {
 			        if(quorum > numProcesos/2) {
 						this.vConfirmacion=comisiones[i];
 						comision=true;
-			        	Server.path("confirmacion").queryParam("comision", vConfirmacion).queryParam("pid", this.pid).request().async().get(); 
+			        	Server.path("confirmacion").queryParam("comision", vConfirmacion).queryParam("pid", this.pid).queryParam("propagado", false).request().async().get(); 
 			            return;
 			        }
 			    }
 			    if(procesosComision==numProcesos)
 			    {
-			    	Server.path("confirmacion").queryParam("comision", -1).queryParam("pid", this.pid).request().async().get();
+			    	Server.path("confirmacion").queryParam("comision", -1).queryParam("pid", this.pid).queryParam("propagado", false).request().async().get();
 			    }
 		    }
 	    }

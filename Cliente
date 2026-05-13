@@ -274,10 +274,10 @@ public class Cliente {
 			while ((linea = br.readLine()) != null) {
 				if(ipServers == null) {
 	                ipServers = linea;
-	                ips.add(linea);
 	            } else {
 	                ipServers += "," + linea;
 	            }
+				ips.add(linea);
 				URI uriServicio = UriBuilder.fromUri("http://"+linea+":8080/procesos/rest/Servicio").build();
                 servicios.add(clienteRest.target(uriServicio));
 			}
@@ -321,14 +321,8 @@ public class Cliente {
         for (int i = 0; i < servicios.size(); i++) {
         	String aux=ips.get(i)+"/"+i;
         	WebTarget serverTarget = servicios.get(i);
-        	serverTarget.path("configuracion").queryParam("ips", ipServers).queryParam("cadenaProcesos", cadenaProcesos).queryParam("totalProcesos", procesos).queryParam("ipServer", aux).request().get();
+        	serverTarget.path("configuracion").queryParam("ips", ipServers).queryParam("cadenaProcesos", cadenaProcesos).queryParam("totalProcesos", procesos).queryParam("ipServicio", aux).request().get();
         	
         }
-        for (WebTarget s : servicios)
-		{
-        	s.path("configuracion").queryParam("ips", ipServers).queryParam("cadenaProcesos", cadenaProcesos).queryParam("totalProcesos", procesos).queryParam("totalProcesos", procesos).request().get();
-        	
-		}
-        
     }
 }
