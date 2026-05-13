@@ -1,45 +1,71 @@
 package services;
-import java.util.*;
-import java.net.URI;
 
+import java.net.URI;
 import javax.inject.Singleton;
 import javax.ws.rs.Path;
 import javax.ws.rs.client.*;
 import javax.ws.rs.core.*;
-import java.net.URI;
 
 
 
 @Singleton
 @Path("Proceso")
-public class Proceso extends Thread {
+public class Proceso {
 	
-	static int numProcesos=6;
-	private int id;
-	private int variable;
+	private int pid, valor, vCompromiso, vComision, vConfirmacion;
+	private int procesosCompromiso=0, procesosComision=0;
+	private int numProcesos;
 	private boolean error;
 	WebTarget Server;
 	private Client clienteRest = ClientBuilder.newClient();
 	URI uri=UriBuilder.fromUri("http://localhost:8080/procesos/rest/Servicio").build(); // Cada proceso tendrá su servidor
-	int compromisos[] = new int[numProcesos];
-	int comisiones[] = new int[numProcesos];
+	int compromisos[]; 
+	int comisiones[];
+	boolean compromiso;
+	boolean comision;
 	
-	public Proceso(int id, boolean error, String url) {
-        this.id = id;
+	public Proceso(int pid, boolean error, String url, int numProcesos) {
+        this.pid = pid;
         this.error=error;
+		this.numProcesos = numProcesos;
+		this.compromisos = new int[numProcesos];   
+		this.comisiones  = new int[numProcesos];
+
         URI uri=UriBuilder.fromUri(url).build();
         this.Server = clienteRest.target(uri);
     }
 	
 	
-	public void propuesta (int variable) {
+	/*	los getter y setter	*/
+	public int getIdProceso() 
+	{
+		return this.pid;				
+	}
+	public boolean getError() 
+	{
+		return this.error;				
+	}
+	public void setError(boolean error) 
+	{
+		this.error=error;				
+	}
+	
+	
+	
+	
+	public synchronized void propuesta (int variable) {
 		//Todos deberían ya estár aqui
+		procesosCompromiso=0;
+		procesosComision=0;
+		compromiso=false;
+		comision=false;
 		for(int i=0; i<numProcesos; i++)
 		{
 			compromisos[i]=0;
 			comisiones[i]=0;
 		}
-		variable=-1;
+		
+		
 		
 		//Les llega lo del Cliente
 		
@@ -49,93 +75,147 @@ public class Proceso extends Thread {
 			do {
 				random = (int)(Math.random() * 201);
 			}while(random==variable || random==0);
-			compromisos[id]=random;
-			Server.path("compromiso").queryParam("propuesta", random).queryParam("id", this.id).request().get();
+			compromisos[pid-1]=random;
+			vCompromiso=random;
+			procesosCompromiso++;
 		}
 		else {
 			//Si no lo hay les manda el que nos llego
-			compromisos[id]=variable;
-			Server.path("compromiso").queryParam("propuesta", variable).queryParam("id", this.id).request().get();
+			compromisos[pid-1]=variable;
+			procesosCompromiso++;
+			vCompromiso=variable;
 		}
-				
+		this.valor=vCompromiso;
+			
     }
 	
-	public void compromiso(int propuesta, int id) {
+	public synchronized void enviar () {
+		Server.path("compromiso").queryParam("propuesta", vCompromiso).queryParam("pid", this.pid).request().async().get();		
+	}
+	
+	public synchronized void compromiso(int propuesta, int pid) {
 		int quorum=0;
-		int comprobar=0;
-		if(compromisos[id]==0)
-			compromisos[id]=propuesta;
-		
-		for(int i=0;i<numProcesos;i++)
+		compromisos[pid-1]=propuesta;
+		procesosCompromiso++;
+		if(!compromiso)
 		{
-			comprobar=compromisos[i];
-			quorum=0;
-			if (comprobar==0)
-				continue;
-			for(int j=0;j<numProcesos;j++) {
-				if(compromisos[j]==0)
-					continue;
-				else if (compromisos[j]==comprobar) 
-					quorum++;
-			}
-			if(quorum>=4) {
-				//Llamada al srver
-				Server.path("comision").queryParam("compromiso", comprobar).queryParam("id", this.id).request().get();
-				return;		
+			if(procesosCompromiso>numProcesos/2)
+			{
+				for(int i=0;i<numProcesos;i++)
+				{
+					quorum=0;
+					if (compromisos[i]==0)
+						continue;
+					for(int j=0;j<numProcesos;j++) {
+						if(compromisos[j]==0)
+							continue;
+						else if (compromisos[j]==compromisos[i]) 
+							quorum++;
+					}
+					if(quorum>numProcesos/2) {
+						//Llamada al srver
+						this.vComision=compromisos[i];
+						comisiones[this.pid-1]=vComision;
+						compromiso=true;
+						procesosComision++;
+						Server.path("comision").queryParam("compromiso", vComision).queryParam("pid", this.pid).request().async().get();
+						return;		
+					}
+				}
+				if(procesosCompromiso==numProcesos)
+			    {
+					procesosComision++;
+			    	Server.path("comision").queryParam("compromiso", -1).queryParam("pid", this.pid).request().async().get();
+			    }
 			}
 		}
 	}
-		
-		
 		
 				//EN la lista hay numero para el queorum?
 					//SI
 						//Manda mensaje al server para pasar a la siguiente fase
 					//NO
 					
-	
-	
-	public void comision(int compromiso , int id) {
+	public synchronized void comision(int compromiso , int pid) {
 		//Les envia al resto el número que el tiene
 		//Y ellos nos lo envián a nosotros
-		
 		//Vemos que número tiene mayoría y lo pasamos a comisiones
-	    if(comisiones[id] == 0) {
-	        comisiones[id] = compromiso;
-	    }
+
+	    comisiones[pid-1] = compromiso;
 	    int quorum = 0;
-	    for(int i = 0; i < numProcesos; i++) {
-	        int comprobar = comisiones[i];
-	        if (comprobar == 0) continue;
-
-	        quorum = 0;
-	        for(int j = 0; j < numProcesos; j++) {
-	        	if(compromisos[j]==0)
-					continue;
-				else if (compromisos[j]==comprobar) 
-					quorum++;
-	        }
-
-	        if(quorum >= 4) {
-	        	Server.path("confirmacion").queryParam("comision", comprobar).queryParam("id", this.id).request().get(); 
-	            return;
-	        }
+	    procesosComision++;
+	    if(!comision) {
+		    if(procesosComision>numProcesos/2)
+		    {
+			    for(int i = 0; i < numProcesos; i++) {
+			        if (comisiones[i] == 0) continue;
+		
+			        quorum = 0;
+			        for(int j = 0; j < numProcesos; j++) {
+			        	if(comisiones[j]==0)
+							continue;
+						else if (comisiones[j]==comisiones[i]) 
+							quorum++;
+			        }
+		
+			        if(quorum > numProcesos/2) {
+						this.vConfirmacion=comisiones[i];
+						comision=true;
+			        	Server.path("confirmacion").queryParam("comision", vConfirmacion).queryParam("pid", this.pid).request().async().get(); 
+			            return;
+			        }
+			    }
+			    if(procesosComision==numProcesos)
+			    {
+			    	Server.path("confirmacion").queryParam("comision", -1).queryParam("pid", this.pid).request().async().get();
+			    }
+		    }
 	    }
 		
-		int mayoria = 1;
 		//comision(mayoria);
 		
 	}
 	
-	/*public void comision(int consenso) {
-		//Una vez hemos decidido que "consenso" es nuestro número se lo decimos al resto y actualizamos nuestro valor
-		//Y ellos a nosotros
-		int actualizado = 2;
-		confirmacion(actualizado);
-	}*/
+	/*
+		public void comision(int consenso) {
+			//Una vez hemos decidido que "consenso" es nuestro número se lo decimos al resto y actualizamos nuestro valor
+			//Y ellos a nosotros
+			int actualizado = 2;
+			confirmacion(actualizado);
+		}
+	*/
 	
-	public void confirmacion(int actualizado) {
+	public synchronized void confirmacion(int actualizado) {
 		
+	}
+	public synchronized String estado() {
+		/*	para mandar el estado mandaremos una string de la siguiente forma
+		 * 		id						"2"
+		 * 		valor					"1"
+		 * 		lista de compromisos 	"1,1,1,8"
+		 * 		error 					"false"
+		 * 	TODAS SEPARADAS POR "/" EN ESTE EJEMPLO QUEDARÍA ALGO ASÍ "2/1/1,1,1,8/false" 
+		 * */
+		String aux, sError;
+		String sCompromisos=null;
+		for(int i =0; i<numProcesos;i++)
+		{
+			aux=compromisos[i]+"";
+			if(sCompromisos == null) {
+                sCompromisos= aux;
+            } else {
+                sCompromisos=sCompromisos+","+aux;
+            }
+		}
+		if (error)				//si error es true
+		{
+			sError="true";
+		}else
+		{
+			sError = "false";
+		}
+		return (pid+"/"+valor+"/"+sCompromisos+"/"+sError);
+
 	}
 
 }
