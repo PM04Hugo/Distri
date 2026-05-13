@@ -61,8 +61,8 @@ public class Servicio {
 	
 	@GET
     @Path("configuracion")
-	public synchronized void configuracion(@QueryParam("ips") String ipServers, @QueryParam("cadenaProcesos") String cadenaProcesos, @QueryParam("totalProcesos") int totalProcesos) {
-		String[] partes, partes1, partes2;	
+	public synchronized void configuracion(@QueryParam("ips") String ipServers, @QueryParam("cadenaProcesos") String cadenaProcesos, @QueryParam("totalProcesos") int totalProcesos,  @QueryParam("ipServicio") String ipServicio) {
+		String[] partes0, partes, partes1, partes2;	
 		
 		/*
 		 * 	con total procesos pasamos todos los procesos
@@ -70,19 +70,18 @@ public class Servicio {
 		 * 	sacamos cantidad de servidores con partes.length
 		 * 	sacamos nuestra ip
 		 */
-		
+		partes0 =ipServicio.split("/");
+		this.id=Integer.parseInt(partes0[1]);
+		this.uriServer="http://"+partes0[0]+":8080/procesos/rest/Servicio";								//uris para comunicarse con sus procesos
+		miServicio=clienteRest.target(uriServer);
+		System.out.println("MI id["+id+"] MI uri:"+uriServer);
 		partes = ipServers.split(",");
 		this.numServidores = partes.length;
 		this.totalProcesos = totalProcesos;
 		for(int i=0;i<partes.length;i++) 
 		{
-			if(ip.equals(partes[i])) {																			//es él mismo 
-				this.id=i;
-				this.uriServer="http://"+this.ip+":8080/procesos/rest/Servicio";								//uris para comunicarse con sus procesos
-				miServicio=clienteRest.target(uriServer);
-				System.out.println("MI id["+id+"] MI uri:"+uriServer);
-			}else {
-				int idServer=Integer.parseInt(partes[1]);
+			if(i!=id) {
+				int idServer=i;
 				Servicios.add(clienteRest.target("http://"+partes[i]+":8080/procesos/rest/Servicio"));		//uris para comunicarse con otros servicios
 				System.out.println("id["+idServer+"] ip:"+partes[i]);
 			}

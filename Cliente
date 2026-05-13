@@ -30,6 +30,7 @@ public class Cliente {
     WebTarget target = clienteRest.target(uri);
     
     List <WebTarget> servicios = new ArrayList<>();
+    List <String> ips = new ArrayList<>();
     
     int servers, procesos, cont=0;
     String RUTA = System.getProperty("user.home");
@@ -273,6 +274,7 @@ public class Cliente {
 			while ((linea = br.readLine()) != null) {
 				if(ipServers == null) {
 	                ipServers = linea;
+	                ips.add(linea);
 	            } else {
 	                ipServers += "," + linea;
 	            }
@@ -316,9 +318,15 @@ public class Cliente {
          * 		string ips separadas por "," ejemplo: 127.0.0.1, 127.0.0.2, 127.0.0.3
          * 
          * */
+        for (int i = 0; i < servicios.size(); i++) {
+        	String aux=ips.get(i)+"/"+i;
+        	WebTarget serverTarget = servicios.get(i);
+        	serverTarget.path("configuracion").queryParam("ips", ipServers).queryParam("cadenaProcesos", cadenaProcesos).queryParam("totalProcesos", procesos).queryParam("ipServer", aux).request().get();
+        	
+        }
         for (WebTarget s : servicios)
 		{
-        	s.path("configuracion").queryParam("ips", ipServers).queryParam("cadenaProcesos", cadenaProcesos).queryParam("totalProcesos", procesos).request().get();
+        	s.path("configuracion").queryParam("ips", ipServers).queryParam("cadenaProcesos", cadenaProcesos).queryParam("totalProcesos", procesos).queryParam("totalProcesos", procesos).request().get();
         	
 		}
         
